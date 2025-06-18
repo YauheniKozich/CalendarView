@@ -113,17 +113,22 @@ final class CalendarViewController: UIViewController {
 
         coordinator.gestureEventPublisher
             .sink { [weak self] event in
-                guard let self = self else { return }
-                switch event {
-                case .doubleTap:
-                    self.explosionAnimator.registerTap(on: self.collectionView, in: self.view)
-                case .swipeLeft:
-                    self.handleSwipeReactive(withDirection: .left)
-                case .swipeRight:
-                    self.handleSwipeReactive(withDirection: .right)
-                }
+                self?.handleGesture(event)
             }
             .store(in: &cancellables)
+    }
+
+    private func handleGesture(_ event: GestureEvent) {
+        switch event.kind {
+        case .doubleTap:
+            explosionAnimator.registerTap(on: collectionView, in: view)
+        case .swipeLeft:
+            handleSwipeReactive(withDirection: .left)
+        case .swipeRight:
+            handleSwipeReactive(withDirection: .right)
+        case .singleTap:
+            break
+        }
     }
 
     override func viewDidLayoutSubviews() {
