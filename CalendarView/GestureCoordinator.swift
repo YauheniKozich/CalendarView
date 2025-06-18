@@ -30,38 +30,44 @@ final class GestureCoordinator: NSObject {
     }
 
     func setupGestures() {
-        guard let view = view, let gestureView = gestureView else {
-            print("View or gestureView is nil, cannot setup gestures")
+        guard let view = view, let gestureView = gestureView else { return }
+
+        let gestures: [(UIGestureRecognizer, UIView, GestureEvent.Kind)] = [
+            (UITapGestureRecognizer(), gestureView, .singleTap),
+            (UITapGestureRecognizer(), gestureView, .doubleTap),
+            (UISwipeGestureRecognizer(), view, .swipeLeft),
+            (UISwipeGestureRecognizer(), view, .swipeRight)
+        ]
+
+        guard
+            let singleTap = gestures[0].0 as? UITapGestureRecognizer,
+            let doubleTap = gestures[1].0 as? UITapGestureRecognizer,
+            let swipeLeft = gestures[2].0 as? UISwipeGestureRecognizer,
+            let swipeRight = gestures[3].0 as? UISwipeGestureRecognizer
+        else {
             return
         }
 
-        let singleTap = UITapGestureRecognizer()
         singleTap.numberOfTapsRequired = 1
         singleTap.cancelsTouchesInView = false
-        gestureView.addGestureRecognizer(singleTap)
 
-        let doubleTap = UITapGestureRecognizer()
         doubleTap.numberOfTapsRequired = 2
         doubleTap.cancelsTouchesInView = false
-        gestureView.addGestureRecognizer(doubleTap)
-        singleTap.require(toFail: doubleTap)
 
-        let swipeLeft = UISwipeGestureRecognizer()
         swipeLeft.direction = .left
         swipeLeft.cancelsTouchesInView = false
-        view.addGestureRecognizer(swipeLeft)
 
-        let swipeRight = UISwipeGestureRecognizer()
         swipeRight.direction = .right
         swipeRight.cancelsTouchesInView = false
-        view.addGestureRecognizer(swipeRight)
 
-        subscribe(singleTap, in: gestureView, kind: .singleTap)
-        subscribe(doubleTap, in: gestureView, kind: .doubleTap)
-        subscribe(swipeLeft, in: view, kind: .swipeLeft)
-        subscribe(swipeRight, in: view, kind: .swipeRight)
+        singleTap.require(toFail: doubleTap)
+
+        for (gesture, targetView, kind) in gestures {
+            targetView.addGestureRecognizer(gesture)
+            subscribe(gesture, in: targetView, kind: kind)
+        }
     }
-
+    
     private func subscribe<T: UIGestureRecognizer>(
         _ gesture: T,
         in view: UIView,
