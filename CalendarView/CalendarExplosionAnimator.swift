@@ -20,6 +20,7 @@ final class CalendarExplosionAnimator {
 
     private var tapCount = 0
     var tapThreshold: Int = 5
+    private let animationDuration: TimeInterval = 1.0
 
     init(minPushMagnitude: CGFloat = 0.5, maxPushMagnitude: CGFloat = 1.5, elasticity: CGFloat = 0.6) {
         self.minPushMagnitude = minPushMagnitude
@@ -28,46 +29,45 @@ final class CalendarExplosionAnimator {
     }
 
     func explode(cells: [UICollectionViewCell], in view: UIView) {
-        DispatchQueue.main.async {
-            guard !cells.isEmpty else { return }
-            guard !self.isExploding else {
-                self.reset()
-                // Начинаем заново
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async {
                 self.explode(cells: cells, in: view)
-                return
             }
-            self.reset()
-            self.isExploding = true
+            return
+        }
+        guard !cells.isEmpty else { return }
+        guard !self.isExploding else { return }
+        self.reset()
+        self.isExploding = true
 
-            self.animator = UIDynamicAnimator(referenceView: view)
+        self.animator = UIDynamicAnimator(referenceView: view)
 
-            self.gravity = UIGravityBehavior(items: cells)
-            self.collision = UICollisionBehavior(items: cells)
-            self.collision?.translatesReferenceBoundsIntoBoundary = true
+        self.gravity = UIGravityBehavior(items: cells)
+        self.collision = UICollisionBehavior(items: cells)
+        self.collision?.translatesReferenceBoundsIntoBoundary = true
 
-            self.itemBehavior = UIDynamicItemBehavior(items: cells)
-            self.itemBehavior?.elasticity = self.elasticity
-            self.itemBehavior?.allowsRotation = true
+        self.itemBehavior = UIDynamicItemBehavior(items: cells)
+        self.itemBehavior?.elasticity = self.elasticity
+        self.itemBehavior?.allowsRotation = true
 
-            cells.forEach { cell in
-                let delay = TimeInterval.random(in: 0 ... 0.2)
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                    let push = UIPushBehavior(items: [cell], mode: .instantaneous)
-                    push.angle = CGFloat.random(in: 0 ... .pi * 2)
-                    push.magnitude = CGFloat.random(in: self.minPushMagnitude ... self.maxPushMagnitude)
-                    self.animator?.addBehavior(push)
-                }
+        cells.forEach { cell in
+            let delay = TimeInterval.random(in: 0 ... 0.2)
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                let push = UIPushBehavior(items: [cell], mode: .instantaneous)
+                push.angle = CGFloat.random(in: 0 ... .pi * 2)
+                push.magnitude = CGFloat.random(in: self.minPushMagnitude ... self.maxPushMagnitude)
+                self.animator?.addBehavior(push)
             }
+        }
 
-            [self.gravity, self.collision, self.itemBehavior].forEach {
-                if let behavior = $0 {
-                    self.animator?.addBehavior(behavior)
-                }
+        [self.gravity, self.collision, self.itemBehavior].forEach {
+            if let behavior = $0 {
+                self.animator?.addBehavior(behavior)
             }
+        }
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                self.isExploding = false
-            }
+        DispatchQueue.main.asyncAfter(deadline: .now() + self.animationDuration) {
+            self.isExploding = false
         }
     }
 
@@ -89,7 +89,7 @@ final class CalendarExplosionAnimator {
         }
     }
 
-    func restore(collectionView: UICollectionView, in view: UIView) {
+    func restoreUserInteraction(collectionView: UICollectionView, in view: UIView) {
         reset()
         collectionView.isUserInteractionEnabled = true
         view.setNeedsLayout()

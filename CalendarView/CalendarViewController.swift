@@ -96,7 +96,7 @@ final class CalendarViewController: UIViewController {
         resetButton.publisher(for: .touchUpInside)
             .sink { [weak self] in
                 guard let self = self else { return }
-                self.explosionAnimator.restore(collectionView: self.collectionView, in: self.view)
+                self.explosionAnimator.restoreUserInteraction(collectionView: self.collectionView, in: self.view)
                 self.applySnapshot(animatingDifferences: false)
                 self.viewModel.updateDays()
                 self.updateMonthLabel()

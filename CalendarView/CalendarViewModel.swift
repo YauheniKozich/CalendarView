@@ -10,7 +10,7 @@ import Combine
 
 final class CalendarViewModel {
     private let calendar = Calendar.current
-    private let baseDate = Date()
+    private let baseDate = Calendar.current.startOfDay(for: Date()) // фиксированная точка отсчёта
     private let storage: SelectedDatesStorage
    
     private(set) var currentMonthOffset = 0
@@ -71,10 +71,7 @@ final class CalendarViewModel {
     }
     
     func makeCalendarDays() -> [CalendarDay] {
-        let range = selectedDates.count == 2
-            ? (min(selectedDates[0], selectedDates[1]), max(selectedDates[0], selectedDates[1]))
-            : nil
-
+        let range = selectedRange
         return days.map {
             CalendarDay(date: $0, today: today, selectedDates: selectedDates, range: range)
         }
@@ -110,7 +107,8 @@ final class CalendarViewModel {
 
     func isDateInRange(_ date: Date) -> Bool {
         guard let range = selectedRange else { return false }
-        return date > range.start && date < range.end
+        return calendar.compare(date, to: range.start, toGranularity: .day) == .orderedDescending &&
+               calendar.compare(date, to: range.end, toGranularity: .day) == .orderedAscending
     }
 
     func changeMonth(by delta: Int) {
