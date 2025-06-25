@@ -38,7 +38,7 @@ final class CalendarViewController: UIViewController {
             return cell
         }
     }()
-    private let viewModel: CalendarViewModel
+    private let viewModel: any CalendarViewModelProtocol
     private let explosionAnimator: CalendarExplosionAnimator
     private var tapCount = 0
     private var cancellables = Set<AnyCancellable>()
@@ -58,7 +58,7 @@ final class CalendarViewController: UIViewController {
     
     private var gestureCoordinator: GestureCoordinator?
 
-    init(viewModel: CalendarViewModel, explosionAnimator: CalendarExplosionAnimator, gestureCoordinator: GestureCoordinator) {
+    init(viewModel: any CalendarViewModelProtocol, explosionAnimator: CalendarExplosionAnimator, gestureCoordinator: GestureCoordinator) {
         self.viewModel = viewModel
         self.explosionAnimator = explosionAnimator
         self.gestureCoordinator = gestureCoordinator
@@ -75,7 +75,7 @@ final class CalendarViewController: UIViewController {
 
         viewModel.load()
 
-        viewModel.$calendarDays
+        viewModel.calendarDaysPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.applySnapshot()

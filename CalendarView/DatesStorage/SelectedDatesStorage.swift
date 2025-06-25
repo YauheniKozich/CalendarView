@@ -5,7 +5,6 @@
 //  Created by Yauheni Kozich on 14.06.25.
 //
 
-// SelectedDatesStorage.swift
 import Foundation
 
 protocol SelectedDatesStorage {
@@ -22,14 +21,28 @@ final class UserDefaultsSelectedDatesStorage: SelectedDatesStorage {
     }
 
     func save(_ dates: [Date]) {
-        let intervals = dates.map { $0.timeIntervalSince1970 }
-        defaults.set(intervals, forKey: key)
+        guard !dates.isEmpty else {
+            defaults.removeObject(forKey: key)
+            return
+        }
+        do {
+            let data = try JSONEncoder().encode(dates)
+            defaults.set(data, forKey: key)
+        } catch {
+            print("Failed to encode dates for saving: \(error)")
+        }
     }
 
     func load() -> [Date] {
-        guard let intervals = defaults.array(forKey: key) as? [Double] else {
+        guard let data = defaults.data(forKey: key) else {
             return []
         }
-        return intervals.map { Date(timeIntervalSince1970: $0) }
+        do {
+            let dates = try JSONDecoder().decode([Date].self, from: data)
+            return dates
+        } catch {
+            print("Failed to decode dates from storage: \(error)")
+            return []
+        }
     }
 }

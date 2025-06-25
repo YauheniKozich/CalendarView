@@ -5,10 +5,29 @@
 //  Created by Yauheni Kozich on 14.06.25.
 //
 
+
 import Foundation
 import Combine
 
-final class CalendarViewModel {
+protocol CalendarViewModelProtocol: ObservableObject {
+    var calendarDays: [CalendarDay] { get }
+    var calendarDaysPublisher: Published<[CalendarDay]>.Publisher { get }
+    var today: Date { get }
+    var currentMonth: Date { get }
+    var monthFormatter: DateFormatter { get }
+
+    func load()
+    func save()
+    func updateDays()
+    func select(_ date: Date)
+    func clear()
+    func isDateSelected(_ date: Date) -> Bool
+    func isDateInRange(_ date: Date) -> Bool
+    func changeMonth(by delta: Int)
+    func makeCalendarDays() -> [CalendarDay]
+}
+
+final class CalendarViewModel: CalendarViewModelProtocol {
     private let calendar = Calendar.current
     private let baseDate = Calendar.current.startOfDay(for: Date()) // фиксированная точка отсчёта
     private let storage: SelectedDatesStorage
@@ -17,6 +36,8 @@ final class CalendarViewModel {
     private(set) var selectedDates: [Date] = []
     private(set) var days: [Date?] = []
     @Published private(set) var calendarDays: [CalendarDay] = []
+
+    var calendarDaysPublisher: Published<[CalendarDay]>.Publisher { $calendarDays }
 
     var today: Date { calendar.startOfDay(for: Date()) }
 
