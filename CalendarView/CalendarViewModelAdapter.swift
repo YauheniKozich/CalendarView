@@ -13,13 +13,13 @@ import Combine
 final class CalendarViewModelAdapter: ObservableObject {
     @Published var calendarDays: [CalendarDay] = []
 
-    private let viewModel: CalendarViewModel
+    private let viewModel: any CalendarViewModelProtocol
     private var cancellables = Set<AnyCancellable>()
 
-    init(viewModel: CalendarViewModel) {
+    init(viewModel: any CalendarViewModelProtocol) {
         self.viewModel = viewModel
 
-        viewModel.$calendarDays
+        viewModel.calendarDaysPublisher
             .receive(on: DispatchQueue.main)
             .assign(to: &$calendarDays)
 
