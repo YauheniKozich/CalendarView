@@ -242,6 +242,19 @@ extension CalendarViewController: UICollectionViewDelegate {
               date >= viewModel.today else {
             return
         }
+        
+        guard let cell = collectionView.cellForItem(at: indexPath) else {
+            return
+        }
+        
+        UIView.animate(withDuration: 0.1, animations: {
+            cell.transform = CGAffineTransform(scaleX: 2.2, y: 2.2)
+        }, completion: { _ in
+            UIView.animate(withDuration: 0.1) {
+                cell.transform = CGAffineTransform.identity
+            }
+        })
+        
         viewModel.select(date)
     }
 }
