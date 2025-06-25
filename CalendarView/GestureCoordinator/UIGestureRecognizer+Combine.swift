@@ -8,12 +8,6 @@
 import UIKit
 import Combine
 
-extension UIGestureRecognizer {
-    func publisher() -> AnyPublisher<UIGestureRecognizer, Never> {
-        GesturePublisher(gestureRecognizer: self).eraseToAnyPublisher()
-    }
-}
-
 private struct GesturePublisher: Publisher {
     typealias Output = UIGestureRecognizer
     typealias Failure = Never
@@ -52,5 +46,11 @@ private final class GestureSubscription<S: Subscriber>: Subscription where S.Inp
             }
         }
         _ = subscriber?.receive(gesture)
+    }
+}
+
+extension UIGestureRecognizer {
+    func publisher() -> AnyPublisher<UIGestureRecognizer, Never> {
+        GesturePublisher(gestureRecognizer: self).eraseToAnyPublisher()
     }
 }
