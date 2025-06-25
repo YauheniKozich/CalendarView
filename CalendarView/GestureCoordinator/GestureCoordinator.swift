@@ -1,22 +1,19 @@
+//
+//  GestureEvent.swift
+//  CalendarView
+//
+//  Created by Yauheni Kozich on 25.06.25.
+//
+
 import Combine
 import UIKit
-
-struct GestureEvent {
-    enum Kind {
-        case singleTap
-        case doubleTap
-        case swipeLeft
-        case swipeRight
-    }
-    let kind: Kind
-    let location: CGPoint?
-}
 
 final class GestureCoordinator: NSObject {
     private weak var view: UIView?
     private weak var gestureView: UIView?
     private let gestureEventSubject = PassthroughSubject<GestureEvent, Never>()
     private var cancellables = Set<AnyCancellable>()
+    private var addedGestures: [UIGestureRecognizer] = []
 
     var gestureEventPublisher: AnyPublisher<GestureEvent, Never> {
         gestureEventSubject.eraseToAnyPublisher()
@@ -64,6 +61,7 @@ final class GestureCoordinator: NSObject {
 
         for (gesture, targetView, kind) in gestures {
             targetView.addGestureRecognizer(gesture)
+            addedGestures.append(gesture)
             subscribe(gesture, in: targetView, kind: kind)
         }
     }
@@ -75,66 +73,21 @@ final class GestureCoordinator: NSObject {
     ) {
         gesture.publisher()
             .sink { [weak self] gesture in
-                let location = (gesture as? UITapGestureRecognizer)?.location(in: view)
+                let location = gesture.location(in: view)
                 self?.gestureEventSubject.send(GestureEvent(kind: kind, location: location))
             }
             .store(in: &cancellables)
     }
 
     func removeGestures() {
-        view?.gestureRecognizers?.removeAll()
-        gestureView?.gestureRecognizers?.removeAll()
+        for gesture in addedGestures {
+            gesture.view?.removeGestureRecognizer(gesture)
+        }
+        addedGestures.removeAll()
         cancellables.removeAll()
     }
 
     deinit {
         removeGestures()
-    }
-}
-
-extension UIGestureRecognizer {
-    func publisher() -> AnyPublisher<UIGestureRecognizer, Never> {
-        GesturePublisher(gestureRecognizer: self).eraseToAnyPublisher()
-    }
-}
-
-private struct GesturePublisher: Publisher {
-    typealias Output = UIGestureRecognizer
-    typealias Failure = Never
-
-    let gestureRecognizer: UIGestureRecognizer
-
-    func receive<S>(subscriber: S) where S: Subscriber, S.Input == UIGestureRecognizer, S.Failure == Never {
-        let subscription = GestureSubscription(subscriber: subscriber, gestureRecognizer: gestureRecognizer)
-        subscriber.receive(subscription: subscription)
-    }
-}
-
-private final class GestureSubscription<S: Subscriber>: Subscription where S.Input == UIGestureRecognizer {
-    private var subscriber: S?
-    private weak var gestureRecognizer: UIGestureRecognizer?
-
-    init(subscriber: S, gestureRecognizer: UIGestureRecognizer) {
-        self.subscriber = subscriber
-        self.gestureRecognizer = gestureRecognizer
-        gestureRecognizer.addTarget(self, action: #selector(handleGesture))
-    }
-
-    func request(_ demand: Subscribers.Demand) {}
-
-    func cancel() {
-        subscriber = nil
-        gestureRecognizer?.removeTarget(self, action: #selector(handleGesture))
-    }
-
-    @objc private func handleGesture(_ gesture: UIGestureRecognizer) {
-        guard gesture.state == .ended else { return }
-        if let swipe = gesture as? UISwipeGestureRecognizer {
-            guard swipe.direction == .left || swipe.direction == .right else {
-                print("Unsupported swipe direction: \(swipe.direction)")
-                return
-            }
-        }
-        _ = subscriber?.receive(gesture)
     }
 }
