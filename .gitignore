@@ -1,0 +1,40 @@
+# Swift Package Manager
+.build/
+Package.resolved
+*.xcodeproj
+xcuserdata/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon must end with two 
+Icon
+
+# Thumbnails
+._*
+
+# Files that might appear on external disk
+.Spotlight-V100
+.Trashes
+
+# Compiled sources
+*.o
+*.a
+
+# SwiftPM
+.swiftpm/
+.build/
+
+# Xcode
+DerivedData/
+*.xcworkspace
+*.xcodeproj
+*.xcuserstate
+*.xcuserdata
+
+# SwiftLint
+.swiftlint.yml
+SWIFTLINT_README.md
+swiftlint.sh
