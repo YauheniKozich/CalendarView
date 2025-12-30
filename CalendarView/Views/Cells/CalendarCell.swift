@@ -11,7 +11,6 @@ public final class CalendarCell: UICollectionViewCell {
     private let label = UILabel()
     private var calendar: CalendarProvider = CalendarProviderImpl()
     
-    // MARK: - Constants
     private enum Colors: Sendable {
         static let weekendBackground = UIColor.systemGray.withAlphaComponent(0.15)
         static let weekdayBackground = UIColor.gray.withAlphaComponent(0.05)
@@ -86,7 +85,6 @@ public final class CalendarCell: UICollectionViewCell {
         } else if isInRange {
             contentView.backgroundColor = Colors.rangeBackground
         } else if weekday == 1 || weekday == 7 {
-            // Выходные дни (воскресенье = 1, суббота = 7)
             contentView.backgroundColor = Colors.weekendBackground
         } else {
             contentView.backgroundColor = Colors.weekdayBackground

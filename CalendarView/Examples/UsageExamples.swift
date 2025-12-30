@@ -30,7 +30,7 @@ enum CalendarUsageExamples {
         return CalendarAssembly.makeCalendarViewController(configuration: configuration)
     }
 
-    /// Пример создания ViewModel отдельно для использования в SwiftUI или других фреймворках
+    /// Пример создания ViewModel отдельно для использования в бизнес-логике
     @MainActor
     static func createCalendarViewModel() -> CalendarViewModel {
         let configuration = CalendarConfiguration(

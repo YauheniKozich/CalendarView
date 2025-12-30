@@ -112,15 +112,14 @@ public enum DependencyFactories {
                                bottomBoundaryOffset: CGFloat = 80.0,
                                animationTimeout: TimeInterval = 10.0,
                                tapThreshold: Int = 5) -> CalendarExplosionAnimator {
-            let animator = CalendarExplosionAnimator(
+            return CalendarExplosionAnimator(
                 minPushMagnitude: minMagnitude,
                 maxPushMagnitude: maxMagnitude,
                 elasticity: elasticity,
                 bottomBoundaryOffset: bottomBoundaryOffset,
-                animationTimeout: animationTimeout
+                animationTimeout: animationTimeout,
+                tapThreshold: tapThreshold
             )
-            animator.tapThreshold = tapThreshold
-            return animator
         }
 
         /// Создает animator для тестирования
@@ -141,9 +140,11 @@ public enum DependencyFactories {
 
         /// Создает gesture coordinator для тестирования
         @MainActor
-        public static func makeForTesting(view: UIView = UIView(),
-                                         gestureView: UIView = UIView()) -> GestureCoordinator {
-            make(for: view, gestureView: gestureView)
+        public static func makeForTesting(view: UIView? = nil,
+                                         gestureView: UIView? = nil) -> GestureCoordinator {
+            let testView = view ?? UIView()
+            let testGestureView = gestureView ?? UIView()
+            return make(for: testView, gestureView: testGestureView)
         }
     }
 
@@ -200,6 +201,22 @@ public enum DependencyFactories {
                 storage: DateStorageFactory.makeDefault(),
                 dateFormatter: DateFormatterFactory.make(for: locale)
             )
+        }
+    }
+    
+    // MARK: - Haptic Feedback Factory
+    
+    public enum HapticFeedbackFactory {
+        /// Создает стандартный haptic feedback provider (UIKit)
+        @MainActor
+        public static func makeDefault() -> HapticFeedbackProvider {
+            UIKitHapticFeedbackProvider()
+        }
+        
+        /// Создает haptic feedback provider для тестирования (no-op)
+        @MainActor
+        public static func makeForTesting() -> HapticFeedbackProvider {
+            NoOpHapticFeedbackProvider()
         }
     }
 }

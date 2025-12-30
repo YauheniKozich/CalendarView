@@ -1,0 +1,28 @@
+//
+//  GestureRecognizer.swift
+//  CalendarView
+//
+//  Created by Yauheni Kozich on 25.06.25.
+//
+
+import Foundation
+import UIKit
+
+/// Абстрактный распознаватель жестов
+public protocol GestureRecognizer {
+    /// View, к которому привязан жест
+    var view: GestureView? { get }
+
+    /// Состояние жеста
+    var state: GestureState { get }
+
+    /// Цель жеста
+    func location(in view: GestureView?) -> CGPoint
+
+    /// Добавление цели для обработки
+    func addTarget(_ target: Any, action: Selector)
+
+    /// Удаление цели
+    func removeTarget(_ target: Any?, action: Selector?)
+}
+

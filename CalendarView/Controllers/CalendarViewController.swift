@@ -15,65 +15,18 @@ public final class CalendarViewController: UIViewController {
 
     private enum Constants {
         static let cellReuseIdentifier = "CalendarCell"
+        static let buttonHeight: CGFloat = 24
+        static let verticalSpacing: CGFloat = 8
+        static let horizontalMargin: CGFloat = 16
+        static let monthLabelHeight: CGFloat = 30
+        static let topMargin: CGFloat = 8
     }
 
-    private var collectionView: UICollectionView!
-    private let feedbackGenerator = UISelectionFeedbackGenerator()
-    private lazy var dataSource: UICollectionViewDiffableDataSource<Section, CalendarDay> = {
-        return UICollectionViewDiffableDataSource<Section, CalendarDay>(collectionView: collectionView) { [weak self] collectionView, indexPath, calendarDay in
-            guard let self = self else { return UICollectionViewCell() }
-            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: Constants.cellReuseIdentifier, for: indexPath) as? CalendarCell else {
-                return UICollectionViewCell()
-            }
-
-            Logger.debug("Configuring cell at \(indexPath) with calendarDay: date=\(calendarDay.date?.description ?? "nil"), isSelected=\(calendarDay.isSelected), isPlaceholder=\(calendarDay.isPlaceholder)", category: .calendar)
-
-            if let date = calendarDay.date {
-                // Используем уже вычисленные значения из CalendarDay для производительности
-                let isSelected = calendarDay.isSelected
-                let isInRange = calendarDay.isInRange
-                let isPast = date < self.viewModel.today
-
-                cell.configure(with: date, isSelected: isSelected, isInRange: isInRange, isPlaceholder: false, calendar: self.viewModel.calendar)
-                cell.isUserInteractionEnabled = !isPast
-                cell.isAccessibilityElement = true
-
-                // Улучшенная accessibility поддержка
-                let dateString = self.accessibilityDateFormatter.string(from: date)
-
-                var accessibilityLabel = dateString
-
-                if isSelected {
-                    accessibilityLabel += ", выбрана"
-                } else if isInRange {
-                    accessibilityLabel += ", в диапазоне"
-                }
-
-                if isPast {
-                    accessibilityLabel += ", прошедшая дата"
-                }
-
-                cell.accessibilityLabel = accessibilityLabel
-
-                if isPast {
-                    cell.accessibilityHint = "Эта дата уже прошла и недоступна для выбора"
-                } else if !isSelected {
-                    cell.accessibilityHint = "Двойное нажатие для выбора даты"
-                } else {
-                    cell.accessibilityHint = "Дата уже выбрана"
-                }
-
-                cell.accessibilityTraits = isSelected ? [.button, .selected] : .button
-            } else {
-                cell.configure(with: nil, isSelected: false, isInRange: false, isPlaceholder: true, calendar: self.viewModel.calendar)
-                cell.isUserInteractionEnabled = false
-                cell.isAccessibilityElement = false
-            }
-            return cell
-        }
-    }()
+    private var collectionView: UICollectionView?
+    private var dataSource: UICollectionViewDiffableDataSource<Section, CalendarDay>?
     private let viewModel: any CalendarViewModelProtocol
     private let explosionAnimator: CalendarExplosionAnimator
+    private let hapticFeedbackProvider: HapticFeedbackProvider
     private var cancellables = Set<AnyCancellable>()
     private var gestureCancellables = Set<AnyCancellable>()
 
@@ -81,23 +34,57 @@ public final class CalendarViewController: UIViewController {
 
     private let monthLabel = UILabel()
 
-    private lazy var accessibilityDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d MMMM yyyy"
-        return formatter
-    }()
-
     private let clearButton = UIButton(type: .system)
     private let resetButton = UIButton(type: .system)
     
     private var gestureCoordinator: GestureCoordinator?
 
     @MainActor
-    init(viewModel: any CalendarViewModelProtocol, explosionAnimator: CalendarExplosionAnimator, gestureCoordinator: GestureCoordinator? = nil) {
+    init(
+        viewModel: any CalendarViewModelProtocol,
+        explosionAnimator: CalendarExplosionAnimator,
+        hapticFeedbackProvider: HapticFeedbackProvider,
+        gestureCoordinator: GestureCoordinator? = nil
+    ) {
         self.viewModel = viewModel
         self.explosionAnimator = explosionAnimator
+        self.hapticFeedbackProvider = hapticFeedbackProvider
         self.gestureCoordinator = gestureCoordinator
+
         super.init(nibName: nil, bundle: nil)
+
+        // Настройка callback для восстановления после анимации взрыва
+        self.explosionAnimator.onAnimationComplete = { [weak self] in
+            guard let self = self else { return }
+
+            // После анимации взрыва получаем все ячейки календаря
+            guard let collectionView = self.collectionView else { return }
+            let allCells = (0..<collectionView.numberOfItems(inSection: 0)).compactMap { indexPath in
+                collectionView.cellForItem(at: IndexPath(item: indexPath, section: 0))
+            }
+
+            // Восстанавливаем взаимодействие после анимации взрыва
+            self.explosionAnimator.restoreUserInteraction(items: allCells, in: self.view)
+
+            // Принудительно переконфигурируем видимые ячейки для корректного отображения состояний
+            for cell in allCells {
+                if let calendarCell = cell as? CalendarCell,
+                   let indexPath = collectionView.indexPath(for: calendarCell),
+                   indexPath.item < self.viewModel.calendarDays.count {
+                    // Переконфигурируем ячейку с текущими данными
+                    let calendarDay = self.viewModel.calendarDays[indexPath.item]
+                    if let date = calendarDay.date {
+                        // Используем уже вычисленные значения из CalendarDay для производительности
+                        let isSelected = calendarDay.isSelected
+                        let isInRange = calendarDay.isInRange
+                        let isPast = date < self.viewModel.today
+
+                        calendarCell.configure(with: date, isSelected: isSelected, isInRange: isInRange, isPlaceholder: false, calendar: self.viewModel.calendar)
+                        calendarCell.isUserInteractionEnabled = !isPast
+                    }
+                }
+            }
+        }
     }
 
     @MainActor
@@ -110,18 +97,17 @@ public final class CalendarViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = .white
 
-        viewModel.load()
-
-        viewModel.calendarDaysPublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.applySnapshot()
-            }
-            .store(in: &cancellables)
-
         setupMonthLabel()
         setupCollectionView()
         setupButtons()
+
+        viewModel.calendarDaysPublisher
+            .sink { [weak self] _ in
+                self?.applySnapshot(animatingDifferences: false)
+            }
+            .store(in: &cancellables)
+
+        viewModel.load()
 
         clearButton.publisher(for: .touchUpInside)
             .sink { [weak self] in
@@ -130,51 +116,106 @@ public final class CalendarViewController: UIViewController {
             }
             .store(in: &cancellables)
 
+        // Настройка кнопки восстановления
         resetButton.publisher(for: .touchUpInside)
-            .receive(on: DispatchQueue.main)
             .sink { [weak self] in
                 guard let self = self else { return }
-                Logger.info("Reset button pressed - restoring interaction", category: .gesture)
+
+                Logger.debug("Reset button tapped", category: .general)
+
+                // Haptic feedback
+                self.hapticFeedbackProvider.selectionChanged()
+
+                // Очищаем кеш модели перед обновлением
+                // (восстановление может использовать старые данные из кеша)
+                self.viewModel.clearDatesCache()
+
+                // Обновляем модель данных
+                self.viewModel.updateDays()
 
                 // После анимации взрыва получаем все ячейки календаря
-                let allCells = (0..<self.collectionView.numberOfItems(inSection: 0)).compactMap { indexPath in
-                    self.collectionView.cellForItem(at: IndexPath(item: indexPath, section: 0))
+                guard let collectionView = self.collectionView else {
+                    Logger.warning("CollectionView not available for reset", category: .general)
+                    return
                 }
-                Logger.info("Found \(allCells.count) total cells to restore", category: .gesture)
+                let allCells = (0..<collectionView.numberOfItems(inSection: 0)).compactMap { indexPath in
+                    collectionView.cellForItem(at: IndexPath(item: indexPath, section: 0))
+                }
+
+                Logger.debug("Resetting \(allCells.count) cells", category: .general)
 
                 // Восстанавливаем взаимодействие после анимации взрыва
                 self.explosionAnimator.restoreUserInteraction(items: allCells, in: self.view)
 
-                // Обновляем отображение календаря
-                self.viewModel.updateDays()
-                self.applySnapshot()
+                // Исследуем проблему с остаточными ячейками
+                Logger.debug("Investigating residual cells issue", category: .general)
+                Logger.debug("Visible cells before cleanup: \(collectionView.visibleCells.count)", category: .general)
 
-                Logger.info("Interaction and display restored", category: .gesture)
+                // Проверяем, есть ли ячейки в collectionView.subviews
+                let calendarCellsInSubviews = collectionView.subviews.compactMap { $0 as? CalendarCell }
+                Logger.debug("CalendarCell instances in collectionView.subviews: \(calendarCellsInSubviews.count)", category: .general)
+
+                // Проверяем, есть ли ячейки в superview collectionView
+                if let superview = collectionView.superview {
+                    let allCalendarCells = superview.subviews.compactMap { $0 as? CalendarCell }
+                    Logger.debug("Total CalendarCell instances in superview: \(allCalendarCells.count)", category: .general)
+
+                    // Показываем frames остаточных ячеек
+                    allCalendarCells.forEach { cell in
+                        Logger.debug("Residual cell frame: \(cell.frame)", category: .general)
+                    }
+                }
+
+                // Агрессивная очистка всех ячеек перед восстановлением
+                Logger.debug("Removing all visible cells from view hierarchy", category: .general)
+                collectionView.visibleCells.forEach { cell in
+                    cell.removeFromSuperview()
+                }
+
+                // Также проверяем и удаляем любые CalendarCell из superview
+                if let superview = collectionView.superview {
+                    let residualCells = superview.subviews.compactMap { $0 as? CalendarCell }
+                    Logger.debug("Removing \(residualCells.count) residual CalendarCell instances", category: .general)
+                    residualCells.forEach { $0.removeFromSuperview() }
+                }
+
+                // Полностью перезагружаем collection view для сброса всех позиций после взрыва
+                Logger.debug("Performing full collection view reload after explosion", category: .general)
+                collectionView.reloadData()
+
+                // Сбрасываем contentOffset на всякий случай
+                collectionView.contentOffset = .zero
+
+                // После перезагрузки пересчитываем layout для правильной сетки
+                collectionView.collectionViewLayout.invalidateLayout()
+                collectionView.setNeedsLayout()
+                collectionView.layoutIfNeeded()
+
+                // Не применяем snapshot после reloadData, так как reloadData уже обновил данные
+                // self.applySnapshot(animatingDifferences: false)
+
+                Logger.debug("Reset completed - visible cells after reset: \(collectionView.visibleCells.count)", category: .general)
             }
             .store(in: &cancellables)
 
         viewModel.updateDays()
         updateMonthLabel()
-
-        // Настройка gesture coordinator после инициализации view
         setupGestureCoordinatorIfNeeded()
     }
 
     @MainActor
     private func setupGestureCoordinatorIfNeeded() {
-        guard gestureCoordinator == nil else { return }
+        guard gestureCoordinator == nil,
+              let collectionView = collectionView else { return }
         let gestureCoordinator = DependencyFactories.GestureCoordinatorFactory.make(for: self.view, gestureView: collectionView)
         setGestureCoordinator(gestureCoordinator)
     }
 
     @MainActor
     internal func setGestureCoordinator(_ coordinator: GestureCoordinator) {
-        // Очищаем предыдущий gestureCoordinator
         gestureCoordinator?.removeGestures()
         self.gestureCoordinator = coordinator
         coordinator.setupGestures()
-
-        // Очищаем старые gesture подписки перед добавлением новой
         gestureCancellables.removeAll()
 
         coordinator.gestureEventPublisher
@@ -186,23 +227,17 @@ public final class CalendarViewController: UIViewController {
 
     @MainActor
     private func handleGesture(_ event: GestureEvent) {
-        Logger.debug("Gesture received: \(event.kind)", category: .gesture)
-
         switch event.kind {
         case .singleTap:
             // Подсчет тапов для активации взрыва на 5-м тапе
+            guard let collectionView = collectionView else { return }
             let visibleCells = collectionView.visibleCells
-            Logger.debug("Single tap: registering with \(visibleCells.count) visible cells", category: .gesture)
             explosionAnimator.registerTap(on: visibleCells, in: view)
         case .doubleTap:
-            // Double tap временно отключен для тестирования
-            Logger.debug("Double tap received (ignored)", category: .gesture)
             break
         case .swipeLeft:
-            Logger.debug("Swipe left received", category: .gesture)
             handleSwipeReactive(withDirection: .left)
         case .swipeRight:
-            Logger.debug("Swipe right received", category: .gesture)
             handleSwipeReactive(withDirection: .right)
         }
     }
@@ -212,27 +247,49 @@ public final class CalendarViewController: UIViewController {
 
         let topInset = view.safeAreaInsets.top
         let bottomInset = view.safeAreaInsets.bottom
-        let buttonHeight: CGFloat = 24
-        let verticalSpacing: CGFloat = 8
+        let contentWidth = view.bounds.width - Constants.horizontalMargin * 2
 
-        monthLabel.frame = CGRect(x: 16, y: topInset + 8,
-                                  width: view.bounds.width - 32,
-                                  height: 30)
+        guard view.bounds.width > 0 && view.bounds.height > 0 else {
+            return
+        }
 
-        collectionView.frame = CGRect(x: 0,
-                                      y: monthLabel.frame.maxY + 8,
-                                      width: view.bounds.width,
-                                      height: view.bounds.height - monthLabel.frame.maxY - 8 - bottomInset - (buttonHeight * 2 + verticalSpacing * 2))
+        monthLabel.frame = CGRect(
+            x: Constants.horizontalMargin,
+            y: topInset + Constants.topMargin,
+            width: contentWidth,
+            height: Constants.monthLabelHeight
+        )
 
-        clearButton.frame = CGRect(x: 16,
-                                   y: view.bounds.height - bottomInset - buttonHeight * 2 - verticalSpacing,
-                                   width: view.bounds.width - 32,
-                                   height: buttonHeight)
+        guard let collectionView = collectionView else { return }
+        let collectionViewTop = monthLabel.frame.maxY + Constants.topMargin
+        let buttonsHeight = Constants.buttonHeight * 2 + Constants.verticalSpacing
+        let collectionViewHeight = view.bounds.height - collectionViewTop - bottomInset - buttonsHeight
 
-        resetButton.frame = CGRect(x: 16,
-                                   y: clearButton.frame.maxY + verticalSpacing,
-                                   width: view.bounds.width - 32,
-                                   height: buttonHeight)
+        collectionView.frame = CGRect(
+            x: 0,
+            y: collectionViewTop,
+            width: view.bounds.width,
+            height: collectionViewHeight
+        )
+
+        let buttonsY = view.bounds.height - bottomInset - buttonsHeight
+        
+        clearButton.frame = CGRect(
+            x: Constants.horizontalMargin,
+            y: buttonsY,
+            width: contentWidth,
+            height: Constants.buttonHeight
+        )
+
+        // Установка frame для кнопки восстановления
+        resetButton.frame = CGRect(
+            x: Constants.horizontalMargin,
+            y: clearButton.frame.maxY + Constants.verticalSpacing,
+            width: contentWidth,
+            height: Constants.buttonHeight
+        )
+
+        Logger.debug("Reset button frame set to: \(resetButton.frame)", category: .general)
     }
 
     // MARK: - Setup UI
@@ -249,33 +306,57 @@ public final class CalendarViewController: UIViewController {
         layout.minimumInteritemSpacing = 0
         layout.minimumLineSpacing = 0
 
-        collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collectionView.register(CalendarCell.self, forCellWithReuseIdentifier: Constants.cellReuseIdentifier)
-        collectionView.delegate = self
-        collectionView.backgroundColor = .white
-        view.addSubview(collectionView)
+        let newCollectionView = UICollectionView(frame: view.bounds, collectionViewLayout: layout)
+        newCollectionView.register(CalendarCell.self, forCellWithReuseIdentifier: Constants.cellReuseIdentifier)
+        newCollectionView.delegate = self
+        newCollectionView.backgroundColor = .white
+        view.addSubview(newCollectionView)
+        collectionView = newCollectionView
+        
+        dataSource = UICollectionViewDiffableDataSource<Section, CalendarDay>(collectionView: newCollectionView) { [weak self] collectionView, indexPath, calendarDay in
+            guard let self = self else { return UICollectionViewCell() }
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: Constants.cellReuseIdentifier, for: indexPath) as? CalendarCell else {
+                return UICollectionViewCell()
+            }
+
+
+            if let date = calendarDay.date {
+                let isSelected = calendarDay.isSelected
+                let isInRange = calendarDay.isInRange
+                let isPast = date < self.viewModel.today
+
+                cell.configure(with: date, isSelected: isSelected, isInRange: isInRange, isPlaceholder: false, calendar: self.viewModel.calendar)
+                cell.isUserInteractionEnabled = !isPast
+
+                let dateString = self.viewModel.dateFormatter.string(from: date, format: "d MMMM yyyy")
+                cell.configureAccessibility(
+                    date: date,
+                    dateString: dateString,
+                    isSelected: isSelected,
+                    isInRange: isInRange,
+                    isPast: isPast
+                )
+            } else {
+                cell.configure(with: nil, isSelected: false, isInRange: false, isPlaceholder: true, calendar: self.viewModel.calendar)
+                cell.isUserInteractionEnabled = false
+                cell.isAccessibilityElement = false
+            }
+            return cell
+        }
     }
 
     @MainActor
     private func applySnapshot(animatingDifferences: Bool = true) {
-        let items = viewModel.makeCalendarDays()
-        Logger.info("Applying snapshot with \(items.count) calendar days, animating: \(animatingDifferences)", category: .calendar)
-
-        // Логируем первые несколько элементов для проверки
-        if let firstItem = items.first {
-            Logger.debug("First calendar day: date=\(firstItem.date?.description ?? "nil"), isSelected=\(firstItem.isSelected)", category: .calendar)
+        guard let dataSource = dataSource else {
+            Logger.error("DataSource is not initialized", category: .calendar)
+            return
         }
 
+        let items = viewModel.calendarDays
         var snapshot = NSDiffableDataSourceSnapshot<Section, CalendarDay>()
         snapshot.appendSections([.main])
         snapshot.appendItems(items)
         dataSource.apply(snapshot, animatingDifferences: animatingDifferences)
-
-        // Принудительно перезагружаем видимые ячейки для обновления отображения
-        if !animatingDifferences {
-            Logger.debug("Reloading visible cells to force UI update", category: .calendar)
-            collectionView.reloadItems(at: collectionView.indexPathsForVisibleItems)
-        }
     }
 
     private func setupButtons() {
@@ -284,38 +365,38 @@ public final class CalendarViewController: UIViewController {
         clearButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
         view.addSubview(clearButton)
 
+        // Настройка кнопки восстановления
         resetButton.setTitle("Восстановить", for: .normal)
         resetButton.setTitleColor(.systemBlue, for: .normal)
         resetButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+        resetButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1) // Для лучшей видимости
+        resetButton.layer.borderColor = UIColor.systemBlue.cgColor
+        resetButton.layer.borderWidth = 1
+        resetButton.layer.cornerRadius = 8
         view.addSubview(resetButton)
+
+        Logger.debug("Reset button added to view", category: .general)
     }
 
     // MARK: - Reactive Actions
 
     @MainActor
     private func handleSwipeReactive(withDirection direction: UISwipeGestureRecognizer.Direction) {
-        // Предотвращаем одновременные swipe анимации
         guard !isUpdatingSubject.value else { return }
 
         isUpdatingSubject.send(true)
         let delta = (direction == .left) ? 1 : -1
 
-        Logger.info("Swipe \(direction == .left ? "left" : "right") - changing month by \(delta)", category: .gesture)
-
         self.viewModel.changeMonth(by: delta)
-        Logger.info("Month changed, current month: \(self.viewModel.currentMonth)", category: .gesture)
 
         self.viewModel.updateDays()
-        Logger.info("Days updated", category: .gesture)
 
         self.updateMonthLabel()
-        Logger.info("Month label updated to: \(self.monthLabel.text ?? "nil")", category: .gesture)
 
-        UIView.transition(with: self.collectionView, duration: 0.3, options: [.transitionCrossDissolve]) {
-            Logger.info("Applying snapshot with animation", category: .gesture)
+        guard let collectionView = self.collectionView else { return }
+        UIView.transition(with: collectionView, duration: 0.3, options: [.transitionCrossDissolve]) {
             self.applySnapshot()
         } completion: { [weak self] _ in
-            Logger.info("Swipe animation completed", category: .gesture)
             self?.isUpdatingSubject.send(false)
         }
     }
@@ -328,6 +409,7 @@ public final class CalendarViewController: UIViewController {
     }
 
     deinit {
+        cancellables.removeAll()
         gestureCancellables.removeAll()
     }
 }
@@ -335,18 +417,15 @@ public final class CalendarViewController: UIViewController {
 extension CalendarViewController: UICollectionViewDelegate {
     @MainActor
     public func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        guard let calendarDay = dataSource.itemIdentifier(for: indexPath),
+        guard let dataSource = dataSource,
+              let calendarDay = dataSource.itemIdentifier(for: indexPath),
               let date = calendarDay.date,
-              date >= viewModel.today else {
+              date >= viewModel.today,
+              let cell = collectionView.cellForItem(at: indexPath) else {
             return
         }
         
-        guard let cell = collectionView.cellForItem(at: indexPath) else {
-            return
-        }
-        
-        // Haptic feedback
-        feedbackGenerator.selectionChanged()
+        hapticFeedbackProvider.selectionChanged()
         
         UIView.animate(withDuration: 0.1, animations: {
             cell.transform = CGAffineTransform(scaleX: 2.2, y: 2.2)
@@ -357,5 +436,6 @@ extension CalendarViewController: UICollectionViewDelegate {
         })
         
         viewModel.select(date)
+        updateMonthLabel()
     }
 }

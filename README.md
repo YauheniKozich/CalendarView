@@ -11,7 +11,7 @@
 - **Поддержка разных календарей** (григорианский, юлианский и др.)
 - **Тестируемый дизайн** с протоколами и mock зависимостями
 - **Структурированное логирование** с категориями
-- **UIKit + SwiftUI совместимость** через адаптеры
+- **UIKit компонент** для интеграции в приложения
 - **Кеширование** для оптимизации производительности
 - **Async/await поддержка** для асинхронных операций
 - **Валидация данных** и bounds checking
@@ -69,12 +69,13 @@ let calendarVC = CalendarAssembly.makeCalendarViewController(
 )
 ```
 
-### Использование в SwiftUI
+### Использование ViewModel отдельно
 
 ```swift
 let viewModel = CalendarAssembly.makeCalendarViewModel(configuration: configuration)
-let adapter = CalendarViewModelAdapter(viewModel: viewModel)
-// Используйте adapter в SwiftUI View
+// ViewModel можно использовать для бизнес-логики без UI
+viewModel.load()
+viewModel.select(Date())
 ```
 
 ## 🏭 Фабрики зависимостей

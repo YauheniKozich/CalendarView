@@ -9,17 +9,29 @@ import UIKit
 
 // MARK: - Configuration
 
-@MainActor
 /// Конфигурация зависимостей календаря
-public struct CalendarConfiguration: Sendable {
+/// Примечание: Не является Sendable, так как содержит протоколы, которые могут иметь mutable состояние
+public struct CalendarConfiguration {
     public let calendar: CalendarProvider
     public let storage: DateStorage
     public let dateFormatter: DateFormatterProvider
 
+    public init(
+        calendar: CalendarProvider,
+        storage: DateStorage,
+        dateFormatter: DateFormatterProvider
+    ) {
+        self.calendar = calendar
+        self.storage = storage
+        self.dateFormatter = dateFormatter
+    }
+
+    @MainActor
     public static var `default`: CalendarConfiguration {
         DependencyFactories.ConfigurationFactory.makeDefault()
     }
 
+    @MainActor
     public static var testing: CalendarConfiguration {
         DependencyFactories.ConfigurationFactory.makeForTesting()
     }
@@ -40,23 +52,30 @@ public enum CalendarAssembly {
     /// Создание ViewController с конфигурацией
     @MainActor public static func makeCalendarViewController(
         configuration: CalendarConfiguration? = nil,
-        explosionAnimator: CalendarExplosionAnimator? = nil
+        explosionAnimator: CalendarExplosionAnimator? = nil,
+        hapticFeedbackProvider: HapticFeedbackProvider? = nil
     ) -> CalendarViewController {
         let config = configuration ?? .default
         let animator = explosionAnimator ?? DependencyFactories.ExplosionAnimatorFactory.makeDefault()
+        let hapticProvider = hapticFeedbackProvider ?? DependencyFactories.HapticFeedbackFactory.makeDefault()
         let viewModel = makeCalendarViewModel(configuration: config)
         return CalendarViewController(
             viewModel: viewModel,
-            explosionAnimator: animator
+            explosionAnimator: animator,
+            hapticFeedbackProvider: hapticProvider
         )
     }
 
     /// Создание полного календаря с дефолтной конфигурацией
     @MainActor public static func makeDefaultCalendarViewController(
-        explosionAnimator: CalendarExplosionAnimator? = nil
+        explosionAnimator: CalendarExplosionAnimator? = nil,
+        hapticFeedbackProvider: HapticFeedbackProvider? = nil
     ) -> CalendarViewController {
-        let animator = explosionAnimator ?? DependencyFactories.ExplosionAnimatorFactory.makeDefault()
-        return makeCalendarViewController(configuration: .default, explosionAnimator: animator)
+        return makeCalendarViewController(
+            configuration: .default,
+            explosionAnimator: explosionAnimator,
+            hapticFeedbackProvider: hapticFeedbackProvider
+        )
     }
 
     // MARK: - Convenience Methods
@@ -64,20 +83,30 @@ public enum CalendarAssembly {
     /// Создание календаря для тестирования
     @MainActor public static func makeTestingCalendarViewController(
         with initialDates: [Date] = [],
-        explosionAnimator: CalendarExplosionAnimator? = nil
+        explosionAnimator: CalendarExplosionAnimator? = nil,
+        hapticFeedbackProvider: HapticFeedbackProvider? = nil
     ) -> CalendarViewController {
         let animator = explosionAnimator ?? DependencyFactories.ExplosionAnimatorFactory.makeForTesting()
+        let hapticProvider = hapticFeedbackProvider ?? DependencyFactories.HapticFeedbackFactory.makeForTesting()
         let configuration = DependencyFactories.ConfigurationFactory.makeForTesting(with: initialDates)
-        return makeCalendarViewController(configuration: configuration, explosionAnimator: animator)
+        return makeCalendarViewController(
+            configuration: configuration,
+            explosionAnimator: animator,
+            hapticFeedbackProvider: hapticProvider
+        )
     }
 
     /// Создание календаря для конкретной локали
     @MainActor public static func makeLocalizedCalendarViewController(
         for locale: Locale,
-        explosionAnimator: CalendarExplosionAnimator? = nil
+        explosionAnimator: CalendarExplosionAnimator? = nil,
+        hapticFeedbackProvider: HapticFeedbackProvider? = nil
     ) -> CalendarViewController {
-        let animator = explosionAnimator ?? DependencyFactories.ExplosionAnimatorFactory.makeDefault()
         let configuration = DependencyFactories.ConfigurationFactory.make(for: locale)
-        return makeCalendarViewController(configuration: configuration, explosionAnimator: animator)
+        return makeCalendarViewController(
+            configuration: configuration,
+            explosionAnimator: explosionAnimator,
+            hapticFeedbackProvider: hapticFeedbackProvider
+        )
     }
 }

@@ -7,24 +7,13 @@
 
 import UIKit
 
-// MARK: - Protocol Conformances
-
-extension UICollectionViewCell: AnimatableItem {}
-
-extension UIView: AnimationContainer {
-    public var visibleItems: [AnimatableItem] {
-        if let collectionView = self as? UICollectionView {
-            return collectionView.visibleCells
-        }
-        return []
-    }
-}
-
 // MARK: - Logger
 
 /// Аниматор для создания эффекта "взрыва" календарных ячеек
 /// Использует UIKit Dynamics для реалистичной физической анимации
-public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, ExplosionAnimator {
+/// Изолирован на MainActor, так как работает с UIKit компонентами
+@MainActor
+public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, ExplosionAnimator, TapTracking {
 
     // MARK: - Configuration Properties
 
@@ -58,9 +47,12 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
 
     // MARK: - Tap Tracking
 
-    private var tapCount = 0
+    private let tapTracker: TapTracker
     /// Количество тапов для активации взрыва
-    public var tapThreshold: Int = 5
+    public var tapThreshold: Int {
+        get { tapTracker.tapThreshold }
+        set { tapTracker.tapThreshold = newValue }
+    }
 
     // MARK: - Callbacks
 
@@ -99,14 +91,14 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     ///   - elasticity: Эластичность ячеек при столкновении (по умолчанию 0.6)
     ///   - bottomBoundaryOffset: Отступ нижней границы от safe area (по умолчанию 80.0)
     ///   - animationTimeout: Максимальное время анимации в секундах (по умолчанию 10.0)
-    @MainActor
-    init(minPushMagnitude: CGFloat = 0.5, maxPushMagnitude: CGFloat = 1.5, elasticity: CGFloat = 0.6, bottomBoundaryOffset: CGFloat = 80.0, animationTimeout: TimeInterval = 10.0) {
+    init(minPushMagnitude: CGFloat = 0.5, maxPushMagnitude: CGFloat = 1.5, elasticity: CGFloat = 0.6, bottomBoundaryOffset: CGFloat = 80.0, animationTimeout: TimeInterval = 10.0, tapThreshold: Int = 5) {
         // Применяем валидацию диапазонов
         self.minPushMagnitude = min(max(minPushMagnitude, minPushMagnitudeRange.lowerBound), minPushMagnitudeRange.upperBound)
         self.maxPushMagnitude = min(max(maxPushMagnitude, maxPushMagnitudeRange.lowerBound), maxPushMagnitudeRange.upperBound)
         self.elasticity = min(max(elasticity, elasticityRange.lowerBound), elasticityRange.upperBound)
         self.bottomBoundaryOffset = min(max(bottomBoundaryOffset, bottomBoundaryOffsetRange.lowerBound), bottomBoundaryOffsetRange.upperBound)
         self.animationTimeout = min(max(animationTimeout, animationTimeoutRange.lowerBound), animationTimeoutRange.upperBound)
+        self.tapTracker = TapTracker(tapThreshold: tapThreshold)
     }
 
     /// Запускает анимацию взрыва для указанных элементов
@@ -122,9 +114,13 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
             throw CalendarError.invalidAnimationParameters(reason: "Unsupported types for animation")
         }
 
+        // Метод уже изолирован на MainActor через @MainActor на классе
+        // Проверка Thread.isMainThread оставлена для дополнительной безопасности
         guard Thread.isMainThread else {
-            DispatchQueue.main.async { [weak self] in
-                try? self?.explode(items: items, in: container)
+            // Если вызван не с main thread, перенаправляем на main actor
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                try? self.explode(items: items, in: container)
             }
             return
         }
@@ -159,10 +155,8 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     ///   - items: Массив элементов для анимации
     ///   - container: Контейнер для анимации
     public func explodeSafely(items: [AnimatableItem], in container: AnimationContainer) {
-        Logger.info("Starting safe explosion with \(items.count) items", category: .animation)
         do {
             try explode(items: items, in: container)
-            Logger.info("Explosion animation started successfully", category: .animation)
         } catch {
             Logger.error("Animation failed: \(error.localizedDescription)", category: .animation)
         }
@@ -183,7 +177,10 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
         timeoutTimer = Timer.scheduledTimer(withTimeInterval: animationTimeout, repeats: false) { [weak self] _ in
             guard let self = self else { return }
             Logger.warning("Animation timeout reached, forcing completion", category: .animation)
-            self.forceAnimationCompletion()
+            // Timer выполняется на main run loop, но для безопасности используем Task
+            Task { @MainActor [weak self] in
+                self?.forceAnimationCompletion()
+            }
         }
     }
 
@@ -194,7 +191,6 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
         timeoutTimer?.invalidate()
         timeoutTimer = nil
         onAnimationComplete?()
-        Logger.info("Animation forcibly completed due to timeout", category: .animation)
     }
     
     /// Настройка физических поведений
@@ -232,10 +228,12 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     
     /// Применение сил взрыва к элементам
     private func applyExplosionForces(to cells: [UIView]) {
-        cells.forEach { cell in
-            let delay = TimeInterval.random(in: 0...0.2)
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                guard let self = self else { return }
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            
+            for cell in cells {
+                let delay = TimeInterval.random(in: 0...0.2)
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 
                 let push = UIPushBehavior(items: [cell], mode: .instantaneous)
                 push.angle = CGFloat.random(in: 0...(.pi * 2))
@@ -262,7 +260,7 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
         timeoutTimer?.invalidate()
         timeoutTimer = nil
         isExploding = false
-        tapCount = 0  // Сбрасываем счетчик тапов
+        tapTracker.resetTapCount()  // Сбрасываем счетчик тапов через TapTracker
     }
 
     /// Регистрирует тап и запускает взрыв при достижении порога
@@ -270,16 +268,11 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     ///   - items: Элементы для анимации
     ///   - container: Контейнер для анимации
     public func registerTap(on items: [AnimatableItem], in container: AnimationContainer) {
-        tapCount += 1
-        Logger.info("Tap registered: \(tapCount)/\(tapThreshold), items count: \(items.count)", category: .gesture)
-
-        if tapCount >= tapThreshold {
-            Logger.info("Explosion threshold reached! Starting explosion animation", category: .animation)
+        if tapTracker.registerTap() {
             explodeSafely(items: items, in: container)
             // Отключаем взаимодействие только для UIView элементов
             (items as? [UIView])?.forEach { $0.isUserInteractionEnabled = false }
-            tapCount = 0
-            Logger.info("Tap count reset to 0", category: .gesture)
+            tapTracker.resetTapCount()
         }
     }
 
@@ -288,17 +281,14 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     ///   - items: Элементы для восстановления
     ///   - container: Контейнер для обновления
     public func restoreUserInteraction(items: [AnimatableItem], in container: AnimationContainer) {
-        Logger.info("Restoring user interaction for \(items.count) items", category: .animation)
         reset()
 
         let uiItems = items.compactMap { $0 as? UIView }
-        Logger.info("Found \(uiItems.count) UIView items out of \(items.count) total items", category: .animation)
 
         uiItems.forEach { uiItem in
             uiItem.isUserInteractionEnabled = true
             // Сбрасываем трансформации к единичной матрице для восстановления нормального вида
             uiItem.transform = .identity
-            Logger.debug("Enabled interaction and reset transform for cell: \(uiItem)", category: .animation)
         }
 
         // Дополнительно сбрасываем любые изменения center, которые мог внести UIDynamicAnimator
@@ -312,7 +302,6 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
                     let originalCenter = CGPoint(x: subview.frame.midX, y: subview.frame.midY)
                     if subview.center != originalCenter {
                         subview.center = originalCenter
-                        Logger.debug("Reset center for cell: \(subview)", category: .animation)
                     }
                 }
             }
@@ -321,10 +310,7 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
         if let uiContainer = container as? UIView {
             uiContainer.setNeedsLayout()
             uiContainer.layoutIfNeeded()
-            Logger.info("Container layout updated", category: .animation)
         }
-
-        Logger.info("User interaction restored", category: .animation)
     }
     
     /// Проверяет, выполняется ли анимация
@@ -334,6 +320,6 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     
     /// Сбрасывает счетчик тапов
     public func resetTapCount() {
-        tapCount = 0
+        tapTracker.resetTapCount()
     }
 }

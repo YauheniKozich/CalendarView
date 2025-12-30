@@ -12,7 +12,8 @@ import UIKit
 
 /// Координатор жестов для обработки различных типов взаимодействий пользователя
 /// Интегрирует UIKit жесты с Combine для реактивного программирования
-
+/// Изолирован на MainActor, так как работает с UIKit компонентами
+@MainActor
 public final class GestureCoordinator: NSObject {
     private weak var view: UIView?
     private weak var gestureView: UIView?
@@ -29,7 +30,6 @@ public final class GestureCoordinator: NSObject {
     /// - Parameters:
     ///   - view: Основной view для жестов (например, для swipe)
     ///   - gestureView: View для тапов (например, ячейка календаря)
-    @MainActor
     init(view: UIView, gestureView: UIView) {
         self.view = view
         self.gestureView = gestureView
@@ -120,6 +120,11 @@ public final class GestureCoordinator: NSObject {
     }
 
     deinit {
-        removeGestures()
+        // deinit вызывается в не-изолированном контексте
+        // Удаление жестов из view требует main actor, но в deinit мы не можем гарантировать это
+        // Поэтому просто очищаем массивы - когда view будет освобожден, жесты автоматически удалятся системой
+        // Очистка массивов безопасна в любом контексте
+        addedGestures.removeAll()
+        cancellables.removeAll()
     }
 }
