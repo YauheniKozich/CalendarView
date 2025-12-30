@@ -6,13 +6,12 @@
 //
 
 import Foundation
-import Combine
 
 /// Протокол для абстракции обработки жестов
 /// Позволяет использовать разные реализации обработки жестов
 public protocol GestureHandler: AnyObject {
-    /// Publisher для событий жестов
-    var gestureEventPublisher: AnyPublisher<GestureEvent, Never> { get }
+    /// Callback для обработки событий жестов
+    var onGestureEvent: ((GestureEvent) -> Void)? { get set }
 
     /// Настройка жестов на view
     func setupGestures(on view: GestureView)

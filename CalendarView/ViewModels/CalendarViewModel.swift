@@ -6,12 +6,11 @@
 //
 
 import Foundation
-import Combine
 
 /// Реализация CalendarViewModelProtocol
 /// Управляет состоянием календаря, выбранными датами и бизнес-логикой
-@MainActor
-public final class CalendarViewModel: CalendarViewModelProtocol, ObservableObject {
+
+public final class CalendarViewModel: CalendarViewModelProtocol {
     private let _calendar: CalendarProvider
     private let baseDate: Date
     private let storage: DateStorage
@@ -20,15 +19,10 @@ public final class CalendarViewModel: CalendarViewModelProtocol, ObservableObjec
     private(set) var currentMonthOffset = 0
     private(set) var selectedDates: [Date] = []
     private(set) var days: [Date?] = []
+    private(set) public var calendarDays: [CalendarDay] = []
 
     // Кеширование для оптимизации поиска selectedDates
     private var _selectedDatesSetCache: Set<String>?
-
-    private let _calendarDaysSubject = CurrentValueSubject<[CalendarDay], Never>([])
-    public var calendarDays: [CalendarDay] {
-        _calendarDaysSubject.value
-    }
-    public var calendarDaysPublisher: AnyPublisher<[CalendarDay], Never> { _calendarDaysSubject.eraseToAnyPublisher() }
 
     /// Сегодняшняя дата
     public var today: Date {
@@ -111,7 +105,7 @@ public final class CalendarViewModel: CalendarViewModelProtocol, ObservableObjec
               let range = _calendar.range(of: .day, in: .month, for: startOfMonth) else {
             Logger.warning("Failed to calculate month range for \(currentMonth)", category: .calendar)
             days = []
-            _calendarDaysSubject.send([])
+            calendarDays = []
             return
         }
 
@@ -121,8 +115,7 @@ public final class CalendarViewModel: CalendarViewModelProtocol, ObservableObjec
             _calendar.date(byAdding: .day, value: $0 - 1, to: startOfMonth)
         }
 
-        let newCalendarDays = makeCalendarDays()
-        _calendarDaysSubject.send(newCalendarDays)
+        calendarDays = makeCalendarDays()
     }
     
     public func makeCalendarDays() -> [CalendarDay] {

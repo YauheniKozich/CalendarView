@@ -11,27 +11,23 @@ import Foundation
 enum CalendarUsageExamples {
 
     /// Пример использования календаря с дефолтными настройками
-    @MainActor
     static func createDefaultCalendar() -> CalendarViewController {
         let explosionAnimator = DependencyFactories.ExplosionAnimatorFactory.makeDefault()
         return CalendarAssembly.makeDefaultCalendarViewController(explosionAnimator: explosionAnimator)
     }
 
     /// Пример использования календаря с русской локалью
-    @MainActor
     static func createRussianCalendar() -> CalendarViewController {
         CalendarAssembly.makeLocalizedCalendarViewController(for: Locale(identifier: "ru_RU"))
     }
 
     /// Пример использования календаря с пользовательским хранилищем в памяти
-    @MainActor
     static func createInMemoryCalendar() -> CalendarViewController {
         let configuration = DependencyFactories.ConfigurationFactory.makeForTesting()
         return CalendarAssembly.makeCalendarViewController(configuration: configuration)
     }
 
     /// Пример создания ViewModel отдельно для использования в бизнес-логике
-    @MainActor
     static func createCalendarViewModel() -> CalendarViewModel {
         let configuration = CalendarConfiguration(
             calendar: DependencyFactories.CalendarProviderFactory.makeDefault(),
@@ -43,7 +39,6 @@ enum CalendarUsageExamples {
     }
 
     /// Пример использования async/await для загрузки данных
-    @MainActor
     static func createCalendarWithAsyncLoading() async throws -> CalendarViewController {
         let configuration = CalendarConfiguration(
             calendar: CalendarProviderImpl(),
@@ -62,7 +57,6 @@ enum CalendarUsageExamples {
     }
 
     /// Пример использования календаря с пользовательским календарем (например, юлианским)
-    @MainActor
     static func createJulianCalendar() -> CalendarViewController {
         let julianCalendar = Calendar(identifier: .gregorian) // Для примера используем григорианский
 
@@ -76,7 +70,6 @@ enum CalendarUsageExamples {
     }
 
     /// Пример тестирования с mock зависимостями
-    @MainActor
     static func createTestCalendar() -> CalendarViewController {
         let testDates = [
             Date().addingTimeInterval(-86400), // Вчера

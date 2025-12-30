@@ -5,26 +5,20 @@
 //  Created by Yauheni Kozich on 25.06.25.
 //
 
-import Combine
 import UIKit
 
 // MARK: - Logger
 
 /// Координатор жестов для обработки различных типов взаимодействий пользователя
-/// Интегрирует UIKit жесты с Combine для реактивного программирования
+/// Использует традиционные UIKit жесты без Combine
 /// Изолирован на MainActor, так как работает с UIKit компонентами
-@MainActor
 public final class GestureCoordinator: NSObject {
     private weak var view: UIView?
     private weak var gestureView: UIView?
-    private let gestureEventSubject = PassthroughSubject<GestureEvent, Never>()
-    private var cancellables = Set<AnyCancellable>()
     private var addedGestures: [UIGestureRecognizer] = []
 
-    /// Publisher для событий жестов
-    var gestureEventPublisher: AnyPublisher<GestureEvent, Never> {
-        gestureEventSubject.eraseToAnyPublisher()
-    }
+    /// Callback для обработки событий жестов
+    var onGestureEvent: ((GestureEvent) -> Void)?
 
     /// Инициализация координатора жестов
     /// - Parameters:
@@ -79,30 +73,31 @@ public final class GestureCoordinator: NSObject {
         addGesture(swipeRight, to: view, kind: .swipeRight)
     }
     
-    /// Добавление жеста с подпиской на события
+    /// Добавление жеста с обработчиком событий
     private func addGesture(_ gesture: UIGestureRecognizer, to view: UIView, kind: GestureKind) {
+        gesture.addTarget(self, action: #selector(handleGesture(_:)))
+        gesture.gestureKind = kind
+        gesture.gestureView = view
         view.addGestureRecognizer(gesture)
         addedGestures.append(gesture)
-        subscribe(gesture, in: view, kind: kind)
     }
-    
-    /// Подписка на события жеста
-    /// - Parameters:
-    ///   - gesture: Жест для подписки
-    ///   - view: View, в котором происходит жест
-    ///   - kind: Тип события жеста
-    private func subscribe<T: UIGestureRecognizer>(
-        _ gesture: T,
-        in view: UIView,
-        kind: GestureKind
-    ) {
-        gesture.publisher()
-            .sink { [weak self] gesture in
-                let location = gesture.location(in: view)
-                let event = GestureEvent(kind: kind, location: location)
-                self?.gestureEventSubject.send(event)
+
+    /// Обработка событий жестов
+    @objc private func handleGesture(_ gesture: UIGestureRecognizer) {
+        guard let kind = gesture.gestureKind,
+              let view = gesture.gestureView,
+              gesture.state == .ended else { return }
+
+        if let swipe = gesture as? UISwipeGestureRecognizer {
+            guard swipe.direction == .left || swipe.direction == .right else {
+                Logger.warning("Unsupported swipe direction: \(swipe.direction)", category: .gesture)
+                return
             }
-            .store(in: &cancellables)
+        }
+
+        let location = gesture.location(in: view)
+        let event = GestureEvent(kind: kind, location: location)
+        onGestureEvent?(event)
     }
 
     /// Удаление всех жестов и очистка ресурсов
@@ -111,12 +106,11 @@ public final class GestureCoordinator: NSObject {
             gesture.view?.removeGestureRecognizer(gesture)
         }
         addedGestures.removeAll()
-        cancellables.removeAll()
     }
-    
+
     /// Проверка, активен ли координатор
     var isActive: Bool {
-        return !addedGestures.isEmpty && !cancellables.isEmpty
+        return !addedGestures.isEmpty
     }
 
     deinit {
@@ -125,6 +119,32 @@ public final class GestureCoordinator: NSObject {
         // Поэтому просто очищаем массивы - когда view будет освобожден, жесты автоматически удалятся системой
         // Очистка массивов безопасна в любом контексте
         addedGestures.removeAll()
-        cancellables.removeAll()
+    }
+}
+
+// MARK: - UIGestureRecognizer Extensions
+
+private extension UIGestureRecognizer {
+    private enum AssociatedKeys {
+        static var gestureKind = "gestureKind"
+        static var gestureView = "gestureView"
+    }
+
+    var gestureKind: GestureKind? {
+        get {
+            return objc_getAssociatedObject(self, AssociatedKeys.gestureKind) as? GestureKind
+        }
+        set {
+            objc_setAssociatedObject(self, AssociatedKeys.gestureKind, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        }
+    }
+
+    var gestureView: UIView? {
+        get {
+            return objc_getAssociatedObject(self, AssociatedKeys.gestureView) as? UIView
+        }
+        set {
+            objc_setAssociatedObject(self, AssociatedKeys.gestureView, newValue, .OBJC_ASSOCIATION_ASSIGN)
+        }
     }
 }

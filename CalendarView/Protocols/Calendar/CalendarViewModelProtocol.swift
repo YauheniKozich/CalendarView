@@ -6,14 +6,12 @@
 //
 
 import Foundation
-import Combine
 
 /// Протокол для ViewModel календаря
 /// Определяет интерфейс для работы с календарными данными
-@MainActor
-public protocol CalendarViewModelProtocol: ObservableObject {
+
+public protocol CalendarViewModelProtocol {
     var calendarDays: [CalendarDay] { get }
-    var calendarDaysPublisher: AnyPublisher<[CalendarDay], Never> { get }
     var today: Date { get }
     var currentMonth: Date { get }
     var monthFormatter: DateFormatterProvider { get }
@@ -35,7 +33,7 @@ public protocol CalendarViewModelProtocol: ObservableObject {
     func makeCalendarDays() -> [CalendarDay]
     func clearDatesCache()
 
-    @MainActor func loadAsync() async throws
-    @MainActor func saveAsync() async throws
+    func loadAsync() async throws
+    func saveAsync() async throws
 }
 

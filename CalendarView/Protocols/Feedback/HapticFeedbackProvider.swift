@@ -9,7 +9,7 @@ import Foundation
 
 /// Протокол для предоставления haptic feedback
 /// Позволяет использовать разные реализации (UIKit, mock для тестирования и т.д.)
-@MainActor
+/// Реализации UIKit должны работать на MainActor
 public protocol HapticFeedbackProvider {
     /// Вызов haptic feedback при выборе элемента
     func selectionChanged()

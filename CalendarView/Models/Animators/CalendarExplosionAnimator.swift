@@ -12,7 +12,7 @@ import UIKit
 /// Аниматор для создания эффекта "взрыва" календарных ячеек
 /// Использует UIKit Dynamics для реалистичной физической анимации
 /// Изолирован на MainActor, так как работает с UIKit компонентами
-@MainActor
+
 public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, ExplosionAnimator, TapTracking {
 
     // MARK: - Configuration Properties
@@ -229,7 +229,7 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     /// Применение сил взрыва к элементам
     private func applyExplosionForces(to cells: [UIView]) {
         Task { @MainActor [weak self] in
-            guard let self = self else { return }
+            guard let self  else { return }
             
             for cell in cells {
                 let delay = TimeInterval.random(in: 0...0.2)

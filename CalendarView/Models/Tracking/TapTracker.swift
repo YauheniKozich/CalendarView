@@ -9,7 +9,6 @@ import Foundation
 
 /// Класс для отслеживания тапов
 /// Отвечает только за подсчет тапов и проверку порога
-@MainActor
 public final class TapTracker: TapTracking {
     private var tapCount = 0
     public var tapThreshold: Int = 5

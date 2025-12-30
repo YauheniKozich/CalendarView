@@ -8,7 +8,7 @@
 import Foundation
 
 /// Реализация CalendarProvider на основе Calendar
-internal final class CalendarProviderImpl: CalendarProvider {
+final class CalendarProviderImpl: CalendarProvider {
     private let calendar: Calendar
 
     public init(calendar: Calendar = .current) {
@@ -60,5 +60,9 @@ internal final class CalendarProviderImpl: CalendarProvider {
 
     public func startOfDay(for date: Date) -> Date {
         calendarWithCurrentTimeZone.startOfDay(for: date)
+    }
+
+    public func isDateInWeekend(_ date: Date) -> Bool {
+        calendarWithCurrentTimeZone.isDateInWeekend(date)
     }
 }

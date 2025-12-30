@@ -7,7 +7,7 @@
 
 import UIKit
 
-public final class CalendarFlowLayout: UICollectionViewFlowLayout {
+final class CalendarFlowLayout: UICollectionViewFlowLayout {
 
     public override func prepare() {
         super.prepare()

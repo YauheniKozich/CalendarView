@@ -8,8 +8,7 @@
 import UIKit
 
 /// Реализация HapticFeedbackProvider на основе UIKit
-@MainActor
-public final class UIKitHapticFeedbackProvider: HapticFeedbackProvider {
+final class UIKitHapticFeedbackProvider: HapticFeedbackProvider {
     private let selectionGenerator: UISelectionFeedbackGenerator
     private let notificationGenerator: UINotificationFeedbackGenerator
     

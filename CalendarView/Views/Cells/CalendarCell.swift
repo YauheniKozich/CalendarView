@@ -7,11 +7,10 @@
 
 import UIKit
 
-public final class CalendarCell: UICollectionViewCell {
+final class CalendarCell: UICollectionViewCell {
     private let label = UILabel()
-    private var calendar: CalendarProvider = CalendarProviderImpl()
     
-    private enum Colors: Sendable {
+    private enum Colors {
         static let weekendBackground = UIColor.systemGray.withAlphaComponent(0.15)
         static let weekdayBackground = UIColor.gray.withAlphaComponent(0.05)
         static let selectedBackground = UIColor.systemBlue
@@ -29,19 +28,36 @@ public final class CalendarCell: UICollectionViewCell {
         fatalError("init(coder:) has not been implemented")
     }
 
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        label.text = ""
+        label.textColor = .black
+        contentView.backgroundColor = .white
+        contentView.layer.borderWidth = 0
+        contentView.layer.borderColor = nil
+        isUserInteractionEnabled = true
+
+        // Reset accessibility state
+        isAccessibilityElement = false
+        accessibilityLabel = nil
+        accessibilityHint = nil
+        accessibilityTraits = []
+    }
+
     func configure(with date: Date?, isSelected: Bool, isInRange: Bool, isPlaceholder: Bool, calendar: CalendarProvider) {
-        self.calendar = calendar
-        if isPlaceholder {
+        if isPlaceholder || date == nil {
             configurePlaceholder()
         } else {
-            configureDateAppearance(date: date ?? Date(), isSelected: isSelected, isInRange: isInRange)
+            configureDateAppearance(date: date!, isSelected: isSelected, isInRange: isInRange, calendar: calendar)
         }
     }
 
     private func setupLabel() {
         label.textAlignment = .center
-        label.font = UIFont.systemFont(ofSize: 16)
+        label.font = UIFont.preferredFont(forTextStyle: .body)
+        label.adjustsFontForContentSizeCategory = true
         label.textColor = .black
+        label.isAccessibilityElement = false
         label.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(label)
         
@@ -53,7 +69,6 @@ public final class CalendarCell: UICollectionViewCell {
 
     private func setupContentView() {
         contentView.layer.cornerRadius = 10
-        contentView.layer.masksToBounds = true
         contentView.backgroundColor = .white
     }
 
@@ -63,28 +78,31 @@ public final class CalendarCell: UICollectionViewCell {
         contentView.backgroundColor = .white
         contentView.layer.borderWidth = 0
         contentView.layer.borderColor = nil
-        isUserInteractionEnabled = false
+
+        isAccessibilityElement = false
+        accessibilityLabel = nil
+        accessibilityHint = nil
+        accessibilityTraits = []
     }
 
-    private func configureDateAppearance(date: Date, isSelected: Bool, isInRange: Bool) {
+    private func configureDateAppearance(date: Date, isSelected: Bool, isInRange: Bool, calendar: CalendarProvider) {
         let day = calendar.component(.day, from: date)
         label.text = "\(day)"
 
-        let weekday = calendar.component(.weekday, from: date)
-        setBackground(for: weekday, isSelected: isSelected, isInRange: isInRange)
+        let isWeekend = calendar.isDateInWeekend(date)
+        setBackground(isWeekend: isWeekend, isSelected: isSelected, isInRange: isInRange)
         setTextColor(isSelected: isSelected, isInRange: isInRange)
 
         contentView.layer.borderWidth = isInRange ? 2 : 0
         contentView.layer.borderColor = isInRange ? Colors.rangeBorder.cgColor : nil
-        isUserInteractionEnabled = true
     }
 
-    private func setBackground(for weekday: Int, isSelected: Bool, isInRange: Bool) {
+    private func setBackground(isWeekend: Bool, isSelected: Bool, isInRange: Bool) {
         if isSelected {
             contentView.backgroundColor = Colors.selectedBackground
         } else if isInRange {
             contentView.backgroundColor = Colors.rangeBackground
-        } else if weekday == 1 || weekday == 7 {
+        } else if isWeekend {
             contentView.backgroundColor = Colors.weekendBackground
         } else {
             contentView.backgroundColor = Colors.weekdayBackground
@@ -92,6 +110,6 @@ public final class CalendarCell: UICollectionViewCell {
     }
 
     private func setTextColor(isSelected: Bool, isInRange: Bool) {
-        label.textColor = isSelected ? .white : .black
+        label.textColor = (isSelected || isInRange) ? .white : .black
     }
 }

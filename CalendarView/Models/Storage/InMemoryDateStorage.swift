@@ -9,7 +9,7 @@ import Foundation
 
 /// Реализация DateStorage для памяти (для тестирования)
 /// Thread-safe реализация с использованием NSLock для синхронизации
-internal final class InMemoryDateStorage: DateStorage {
+final class InMemoryDateStorage: DateStorage {
     private var storage: [Date] = []
     private let lock = NSLock()
 

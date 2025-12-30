@@ -33,6 +33,9 @@ public protocol CalendarProvider {
 
     /// Начало дня для указанной даты
     func startOfDay(for date: Date) -> Date
+
+    /// Проверка, является ли дата выходным днем
+    func isDateInWeekend(_ date: Date) -> Bool
 }
 
 // Удалено расширение Calendar.Component для избежания конфликтов имен

@@ -9,8 +9,7 @@ import Foundation
 
 /// Реализация HapticFeedbackProvider для тестирования (no-op)
 /// Не выполняет никаких действий, используется в тестах
-@MainActor
-public final class NoOpHapticFeedbackProvider: HapticFeedbackProvider {
+final class NoOpHapticFeedbackProvider: HapticFeedbackProvider {
     public init() {}
     
     public func selectionChanged() {
