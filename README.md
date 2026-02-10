@@ -2,11 +2,11 @@
 
 Мощный и гибкий компонент календаря для iOS с поддержкой выбора диапазонов дат и анимированным эффектом "взрыва" ячеек.
 
-## ✨ Особенности
+## Особенности
 
 - **Полностью переиспользуемая архитектура** с dependency injection
 - **Выбор диапазона дат** с визуальным выделением
-- **Анимированный эффект взрыва** ячеек при двойном тапе
+- **Анимированный эффект взрыва** ячеек при 5‑кратном тапе
 - **Гибкая конфигурация** календаря, хранения и форматирования
 - **Поддержка разных календарей** (григорианский, юлианский и др.)
 - **Тестируемый дизайн** с протоколами и mock зависимостями
@@ -14,42 +14,34 @@
 - **UIKit компонент** для интеграции в приложения
 - **Кеширование** для оптимизации производительности
 - **Async/await поддержка** для асинхронных операций
+- **Восстановление выбранного диапазона** после перезапуска
 - **Валидация данных** и bounds checking
 - **Haptic feedback** для лучшего UX
 - **Современные Swift возможности** (structured concurrency)
 
-## 🏗️ Архитектура
+## Архитектура
 
-Проект построен на принципах **чистой архитектуры** с разделением ответственности:
+Проект разделён по слоям и файлам, чтобы логика, хранение и UI не смешивались:
 
-### Протоколы (Protocols/)
-- `CalendarProvider` - абстракция календаря
-- `DateStorage` - абстракция хранения данных
-- `DateFormatterProvider` - абстракция форматирования дат
-- `GestureHandler` - абстракция обработки жестов
-- `ExplosionAnimator` - абстракция анимации
+### Слои
+- **Assembly/Factories**: сборка зависимостей и конфигураций (`CalendarAssembly`, `DependencyFactories`)
+- **ViewModel**: бизнес‑логика выбора дат и диапазона (`CalendarViewModel`)
+- **UI**: контроллер, layout и ячейки (`CalendarViewController`, `CalendarFlowLayout`, `CalendarCell`)
+- **Services**: провайдеры календаря/форматтера/хранилища
+- **Animations & Gestures**: взрыв, жесты, отслеживание тапов
+- **Utils**: логгер, ошибки, утилиты
 
-### Реализации
-- `CalendarProviderImpl` - реализация на основе Calendar
-- `UserDefaultsDateStorage` - хранение в UserDefaults
-- `InMemoryDateStorage` - хранение в памяти (для тестов)
-- `DateFormatterProviderImpl` - реализация на основе DateFormatter
+### Основные протоколы
+- `CalendarProvider` — абстракция календаря
+- `DateStorage` — хранение выбранных дат
+- `DateFormatterProvider` — форматирование дат
+- `ExplosionAnimator` — анимация взрыва
 
-## 🆕 Новые возможности (v2.0)
-
-- **Property Wrappers**: `@Cached`, `@Clamped`, `@Validated`, `@Logged` для лучшей организации кода
-- **Улучшенная Accessibility**: Полная поддержка VoiceOver с детальными описаниями
-- **Timeout для анимаций**: Предотвращение бесконечных анимаций
-- **Кеширование**: Оптимизированное кеширование вычисляемых значений
-- **Структурированные ошибки**: `CalendarError` enum с локализацией
-- **Swift Concurrency**: Async/await поддержка для всех операций
-
-## 📖 Использование
+## Использование
 
 ### Базовое использование
 
 ```swift
-// Создание календаря с настройками по умолчанию
 let explosionAnimator = CalendarExplosionAnimator()
 let calendarVC = CalendarAssembly.makeDefaultCalendarViewController(explosionAnimator: explosionAnimator)
 ```
@@ -69,36 +61,18 @@ let calendarVC = CalendarAssembly.makeCalendarViewController(
 )
 ```
 
-### Использование ViewModel отдельно
+### ViewModel без UI
 
 ```swift
 let viewModel = CalendarAssembly.makeCalendarViewModel(configuration: configuration)
-// ViewModel можно использовать для бизнес-логики без UI
 viewModel.load()
 viewModel.select(Date())
-```
-
-## 🏭 Фабрики зависимостей
-
-Проект использует фабричный паттерн для централизованного создания всех зависимостей:
-
-```swift
-// Создание зависимостей через фабрики
-let calendar = DependencyFactories.CalendarProviderFactory.makeDefault()
-let storage = DependencyFactories.DateStorageFactory.makeForTesting()
-let formatter = DependencyFactories.DateFormatterFactory.makeDefault()
-
-// Или через конфигурацию
-let config = DependencyFactories.ConfigurationFactory.makeForTesting()
-
-// Создание календаря через Assembly
-let calendarVC = CalendarAssembly.makeTestingCalendarViewController()
 ```
 
 ### Async/Await поддержка
 
 ```swift
-// Асинхронная загрузка данных
+// Асинхронная загрузка
 let viewModel = CalendarAssembly.makeCalendarViewModel(configuration: config)
 try await viewModel.loadAsync()
 
@@ -113,48 +87,6 @@ if success {
 }
 ```
 
-### Обработка ошибок
-
-```swift
-do {
-    try animator.explode(items: cells, in: view)
-} catch CalendarError.animationInProgress {
-    print("Анимация уже выполняется")
-} catch CalendarError.invalidAnimationParameters(let reason) {
-    print("Ошибка параметров: \(reason)")
-} catch {
-    print("Неизвестная ошибка: \(error)")
-}
-
-// Или использовать безопасную версию без обработки ошибок
-animator.explodeSafely(items: cells, in: view)
-```
-
-### Оптимизации производительности
-
-- **Кеширование** часто вычисляемых значений (`currentMonth`, `selectedRange`)
-- **Инвалидация кеша** при изменении состояния
-- **Bounds checking** для анимаций
-- **Валидация входных данных** с логированием
-- **Haptic feedback** для лучшего пользовательского опыта
-
-### Property Wrappers
-
-```swift
-// Автоматическое кеширование
-@Cached var currentMonth: String { computeMonth() }
-
-// Ограничение диапазона значений (применяется в init)
-@Clamped(wrappedValue: 0.6, range: 0.0...1.0) var elasticity: CGFloat
-
-// Валидация значений
-@Validated(wrappedValue: 10.0, validator: { $0 > 0 }, errorMessage: "Must be positive")
-var timeout: TimeInterval
-
-// Логирование изменений
-@Logged(wrappedValue: false, label: "animation state") var isAnimating: Bool
-```
-
 ### Конфигурация анимации
 
 ```swift
@@ -164,26 +96,12 @@ let animator = CalendarExplosionAnimator(
     maxPushMagnitude: 1.5,     // 0.0...5.0
     elasticity: 0.6,           // 0.0...1.0
     bottomBoundaryOffset: 80.0, // 0.0...200.0
-    animationTimeout: 10.0     // 1.0...60.0
+    animationTimeout: 10.0,     // 1.0...60.0
+    tapThreshold: 5            // количество тапов для взрыва
 )
 ```
 
-### Тестирование
-
-```swift
-let testConfig = CalendarConfiguration(
-    calendar: CalendarProviderImpl(),
-    storage: InMemoryDateStorage(),
-    dateFormatter: DateFormatterProviderImpl()
-)
-
-let testCalendar = CalendarAssembly.makeCalendarViewController(
-    configuration: testConfig,
-    explosionAnimator: explosionAnimator
-)
-```
-
-## 🔧 Конфигурация
+## Конфигурация
 
 ### CalendarConfiguration
 ```swift
@@ -194,50 +112,14 @@ struct CalendarConfiguration {
 }
 ```
 
-### Доступные реализации
+### Примеры реализаций
 
-#### Календари
-- `CalendarProviderImpl(calendar: Calendar(identifier: .gregorian))` - Григорианский
-- `CalendarProviderImpl(calendar: Calendar(identifier: .hebrew))` - Иврит
-- `CalendarProviderImpl(calendar: Calendar(identifier: .islamic))` - Исламский
-
-#### Хранилища
-- `UserDefaultsDateStorage(key: "calendar")` - UserDefaults
-- `InMemoryDateStorage(initialDates: [])` - Память (для тестов)
-
-#### Форматтеры
+- `CalendarProviderImpl(calendar: Calendar(identifier: .gregorian))`
+- `UserDefaultsDateStorage(key: "calendar")`
+- `InMemoryDateStorage(initialDates: [])`
 - `DateFormatterProviderImpl(locale: Locale(identifier: "ru_RU"), dateFormat: "MMMM yyyy")`
 
-## 🎯 Переиспользование
-
-Компоненты спроектированы для максимальной переиспользуемости:
-
-- **CalendarProvider** позволяет использовать разные календари
-- **DateStorage** абстрагирует хранение данных
-- **GestureHandler** позволяет заменить обработку жестов
-- **ExplosionAnimator** можно заменить на другие анимации
-
-## 📝 Логирование
-
-Используется структурированное логирование с категориями:
-
-```swift
-Logger.info("Календарь загружен", category: .calendar)
-Logger.error("Ошибка сохранения", category: .storage)
-Logger.warning("Неизвестный жест", category: .gesture)
-```
-
-## 🧪 Тестирование
-
-Архитектура поддерживает тестирование с mock зависимостями:
-
-```swift
-// Используйте InMemoryDateStorage для тестов
-// Передавайте тестовые реализации протоколов
-// Все компоненты разделены и тестируемы независимо
-```
-
-## 📋 Требования
+## Требования
 
 - iOS 13.0+
 - Swift 5.0+

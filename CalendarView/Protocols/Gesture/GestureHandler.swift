@@ -1,15 +1,8 @@
-//
-//  GestureHandler.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 25.06.25.
-//
-
-import Foundation
+ import Foundation
 
 /// Протокол для абстракции обработки жестов
 /// Позволяет использовать разные реализации обработки жестов
-public protocol GestureHandler: AnyObject {
+protocol GestureHandler: AnyObject {
     /// Callback для обработки событий жестов
     var onGestureEvent: ((GestureEvent) -> Void)? { get set }
 

@@ -1,18 +1,11 @@
-//
-//  UIKitHapticFeedbackProvider.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 28.12.2025.
-//
-
-import UIKit
+ import UIKit
 
 /// Реализация HapticFeedbackProvider на основе UIKit
 final class UIKitHapticFeedbackProvider: HapticFeedbackProvider {
     private let selectionGenerator: UISelectionFeedbackGenerator
     private let notificationGenerator: UINotificationFeedbackGenerator
     
-    public init() {
+    init() {
         self.selectionGenerator = UISelectionFeedbackGenerator()
         self.notificationGenerator = UINotificationFeedbackGenerator()
         // Подготавливаем генераторы для лучшей производительности
@@ -20,22 +13,22 @@ final class UIKitHapticFeedbackProvider: HapticFeedbackProvider {
         notificationGenerator.prepare()
     }
     
-    public func selectionChanged() {
+    func selectionChanged() {
         selectionGenerator.selectionChanged()
         selectionGenerator.prepare() // Подготавливаем для следующего использования
     }
     
-    public func success() {
+    func success() {
         notificationGenerator.notificationOccurred(.success)
         notificationGenerator.prepare()
     }
     
-    public func error() {
+    func error() {
         notificationGenerator.notificationOccurred(.error)
         notificationGenerator.prepare()
     }
     
-    public func warning() {
+    func warning() {
         notificationGenerator.notificationOccurred(.warning)
         notificationGenerator.prepare()
     }

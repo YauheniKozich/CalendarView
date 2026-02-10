@@ -1,21 +1,10 @@
-//
-//  CalendarExplosionAnimator.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 14.06.25.
-//
-
-import UIKit
-
-// MARK: - Logger
+ import UIKit
 
 /// Аниматор для создания эффекта "взрыва" календарных ячеек
 /// Использует UIKit Dynamics для реалистичной физической анимации
 /// Изолирован на MainActor, так как работает с UIKit компонентами
 
-public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, ExplosionAnimator, TapTracking {
-
-    // MARK: - Configuration Properties
+final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, ExplosionAnimator, TapTracking {
 
     /// Минимальная сила толчка для ячеек
     private var minPushMagnitude: CGFloat
@@ -28,15 +17,11 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     /// Максимальное время анимации в секундах
     private var animationTimeout: TimeInterval
 
-    // MARK: - Validation Ranges
-
     private let minPushMagnitudeRange: ClosedRange<CGFloat> = 0.0...2.0
     private let maxPushMagnitudeRange: ClosedRange<CGFloat> = 0.0...5.0
     private let elasticityRange: ClosedRange<CGFloat> = 0.0...1.0
     private let bottomBoundaryOffsetRange: ClosedRange<CGFloat> = 0.0...200.0
     private let animationTimeoutRange: ClosedRange<TimeInterval> = 1.0...60.0
-
-    // MARK: - Animation Properties
 
     private var animator: UIDynamicAnimator?
     private var timeoutTimer: Timer?
@@ -45,19 +30,15 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     private var itemBehavior: UIDynamicItemBehavior?
     private var isExploding = false
 
-    // MARK: - Tap Tracking
-
     private let tapTracker: TapTracker
     /// Количество тапов для активации взрыва
-    public var tapThreshold: Int {
+    var tapThreshold: Int {
         get { tapTracker.tapThreshold }
         set { tapTracker.tapThreshold = newValue }
     }
 
-    // MARK: - Callbacks
-
     /// Callback, вызываемый при завершении анимации
-    public var onAnimationComplete: (() -> Void)?
+    var onAnimationComplete: (() -> Void)?
 
     /// Async версия анимации взрыва
     /// - Parameters:
@@ -65,7 +46,7 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     ///   - container: Контейнер для анимации
     /// - Returns: true если анимация запущена успешно
     @discardableResult
-    public func explodeAsync(items: [AnimatableItem], in container: AnimationContainer) async -> Bool {
+    func explodeAsync(items: [AnimatableItem], in container: AnimationContainer) async -> Bool {
         // Если анимация уже идет, завершаем немедленно
         if self.isExploding {
             return false
@@ -106,7 +87,7 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     ///   - items: Массив элементов для анимации
     ///   - container: Контейнер для анимации
     /// - Throws: CalendarError при ошибках валидации
-    public func explode(items: [AnimatableItem], in container: AnimationContainer) throws {
+    func explode(items: [AnimatableItem], in container: AnimationContainer) throws {
         // Поскольку это UIKit-специфичная реализация, приводим типы
         guard let cells = items as? [UIView],
               let view = container as? UIView else {
@@ -154,7 +135,7 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     /// - Parameters:
     ///   - items: Массив элементов для анимации
     ///   - container: Контейнер для анимации
-    public func explodeSafely(items: [AnimatableItem], in container: AnimationContainer) {
+    func explodeSafely(items: [AnimatableItem], in container: AnimationContainer) {
         do {
             try explode(items: items, in: container)
         } catch {
@@ -242,16 +223,14 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
             }
         }
     }
-    
-    // MARK: - UIDynamicAnimatorDelegate
 
-    public func dynamicAnimatorDidPause(_ animator: UIDynamicAnimator) {
+    func dynamicAnimatorDidPause(_ animator: UIDynamicAnimator) {
         isExploding = false
         onAnimationComplete?()
     }
 
     /// Сброс всех анимаций и состояний
-    public func reset() {
+    func reset() {
         animator?.removeAllBehaviors()
         animator = nil
         gravity = nil
@@ -267,7 +246,7 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     /// - Parameters:
     ///   - items: Элементы для анимации
     ///   - container: Контейнер для анимации
-    public func registerTap(on items: [AnimatableItem], in container: AnimationContainer) {
+    func registerTap(on items: [AnimatableItem], in container: AnimationContainer) {
         if tapTracker.registerTap() {
             explodeSafely(items: items, in: container)
             // Отключаем взаимодействие только для UIView элементов
@@ -280,7 +259,7 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     /// - Parameters:
     ///   - items: Элементы для восстановления
     ///   - container: Контейнер для обновления
-    public func restoreUserInteraction(items: [AnimatableItem], in container: AnimationContainer) {
+    func restoreUserInteraction(items: [AnimatableItem], in container: AnimationContainer) {
         reset()
 
         let uiItems = items.compactMap { $0 as? UIView }
@@ -314,12 +293,12 @@ public final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegat
     }
     
     /// Проверяет, выполняется ли анимация
-    public var isAnimating: Bool {
+    var isAnimating: Bool {
         return isExploding
     }
     
     /// Сбрасывает счетчик тапов
-    public func resetTapCount() {
+    func resetTapCount() {
         tapTracker.resetTapCount()
     }
 }

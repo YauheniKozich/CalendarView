@@ -1,12 +1,10 @@
-//
-import Foundation
-import OSLog
+ import OSLog
 
 /// Логер приложения на основе OSLog
 /// Предоставляет структурированное логирование с категориями и уровнями
-public enum Logger {
+enum Logger {
     /// Категории логирования
-    public enum Category: String, Sendable {
+    enum Category: String, Sendable {
         case calendar = "Calendar"
         case gesture = "Gesture"
         case storage = "Storage"
@@ -15,7 +13,7 @@ public enum Logger {
     }
 
     /// Уровни логирования
-    public enum Level: String, Sendable {
+    enum Level: String, Sendable {
         case debug = "DEBUG"
         case info = "INFO"
         case warning = "WARNING"
@@ -27,7 +25,7 @@ public enum Logger {
     ///   - message: Сообщение для логирования
     ///   - category: Категория логирования
     ///   - level: Уровень логирования
-    public static func log(
+    static func log(
         _ message: String,
         category: Category = .general,
         level: Level = .info
@@ -47,22 +45,22 @@ public enum Logger {
     }
 
     /// Логирование отладочной информации
-    public static func debug(_ message: String, category: Category = .general) {
+    static func debug(_ message: String, category: Category = .general) {
         log(message, category: category, level: .debug)
     }
 
     /// Логирование информационных сообщений
-    public static func info(_ message: String, category: Category = .general) {
+    static func info(_ message: String, category: Category = .general) {
         log(message, category: category, level: .info)
     }
 
     /// Логирование предупреждений
-    public static func warning(_ message: String, category: Category = .general) {
+    static func warning(_ message: String, category: Category = .general) {
         log(message, category: category, level: .warning)
     }
 
     /// Логирование ошибок
-    public static func error(_ message: String, category: Category = .general) {
+    static func error(_ message: String, category: Category = .general) {
         log(message, category: category, level: .error)
     }
 }

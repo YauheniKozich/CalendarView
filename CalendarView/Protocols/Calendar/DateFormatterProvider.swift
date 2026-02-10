@@ -1,9 +1,8 @@
-//
-import Foundation
+ import Foundation
 
 /// Протокол для форматирования дат
 /// Позволяет использовать разные форматы и локали
-public protocol DateFormatterProvider {
+protocol DateFormatterProvider {
     /// Форматирование даты в строку
     func string(from date: Date) -> String
 

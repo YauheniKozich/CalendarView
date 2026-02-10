@@ -1,14 +1,7 @@
-//
-//  GestureState.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 25.06.25.
-//
-
-import Foundation
+ import Foundation
 
 /// Состояние распознавателя жестов
-public enum GestureState: Sendable {
+enum GestureState: Sendable {
     case possible
     case began
     case changed

@@ -1,22 +1,13 @@
-//
-//  CalendarAssembly.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 18.06.25.
-//
-
-import UIKit
-
-// MARK: - Configuration
+ import UIKit
 
 /// Конфигурация зависимостей календаря
 /// Примечание: Не является Sendable, так как содержит протоколы, которые могут иметь mutable состояние
-public struct CalendarConfiguration {
-    public let calendar: CalendarProvider
-    public let storage: DateStorage
-    public let dateFormatter: DateFormatterProvider
+struct CalendarConfiguration {
+    let calendar: CalendarProvider
+    let storage: DateStorage
+    let dateFormatter: DateFormatterProvider
 
-    public init(
+    init(
         calendar: CalendarProvider,
         storage: DateStorage,
         dateFormatter: DateFormatterProvider
@@ -27,20 +18,20 @@ public struct CalendarConfiguration {
     }
 
     
-    public static var `default`: CalendarConfiguration {
+    static var `default`: CalendarConfiguration {
         DependencyFactories.ConfigurationFactory.makeDefault()
     }
 
    
-    public static var testing: CalendarConfiguration {
+    static var testing: CalendarConfiguration {
         DependencyFactories.ConfigurationFactory.makeForTesting()
     }
 }
 
-public enum CalendarAssembly {
+enum CalendarAssembly {
     /// Создание ViewModel с конфигурацией
     
-    public static func makeCalendarViewModel(configuration: CalendarConfiguration? = nil) -> CalendarViewModel {
+    static func makeCalendarViewModel(configuration: CalendarConfiguration? = nil) -> CalendarViewModel {
         let config = configuration ?? .default
         return CalendarViewModel(
             calendar: config.calendar,
@@ -50,7 +41,7 @@ public enum CalendarAssembly {
     }
 
     /// Создание ViewController с конфигурацией
-   public static func makeCalendarViewController(
+   static func makeCalendarViewController(
         configuration: CalendarConfiguration? = nil,
         explosionAnimator: CalendarExplosionAnimator? = nil,
         hapticFeedbackProvider: HapticFeedbackProvider? = nil
@@ -67,7 +58,7 @@ public enum CalendarAssembly {
     }
 
     /// Создание полного календаря с дефолтной конфигурацией
-    public static func makeDefaultCalendarViewController(
+    static func makeDefaultCalendarViewController(
         explosionAnimator: CalendarExplosionAnimator? = nil,
         hapticFeedbackProvider: HapticFeedbackProvider? = nil
     ) -> CalendarViewController {
@@ -78,10 +69,8 @@ public enum CalendarAssembly {
         )
     }
 
-    // MARK: - Convenience Methods
-
     /// Создание календаря для тестирования
-    public static func makeTestingCalendarViewController(
+    static func makeTestingCalendarViewController(
         with initialDates: [Date] = [],
         explosionAnimator: CalendarExplosionAnimator? = nil,
         hapticFeedbackProvider: HapticFeedbackProvider? = nil
@@ -97,7 +86,7 @@ public enum CalendarAssembly {
     }
 
     /// Создание календаря для конкретной локали
-    public static func makeLocalizedCalendarViewController(
+    static func makeLocalizedCalendarViewController(
         for locale: Locale,
         explosionAnimator: CalendarExplosionAnimator? = nil,
         hapticFeedbackProvider: HapticFeedbackProvider? = nil

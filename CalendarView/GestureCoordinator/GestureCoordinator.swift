@@ -1,18 +1,9 @@
-//
-//  GestureEvent.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 25.06.25.
-//
-
-import UIKit
-
-// MARK: - Logger
+ import UIKit
 
 /// Координатор жестов для обработки различных типов взаимодействий пользователя
 /// Использует традиционные UIKit жесты без Combine
 /// Изолирован на MainActor, так как работает с UIKit компонентами
-public final class GestureCoordinator: NSObject {
+final class GestureCoordinator: NSObject, UIGestureRecognizerDelegate {
     private weak var view: UIView?
     private weak var gestureView: UIView?
     private var addedGestures: [UIGestureRecognizer] = []
@@ -28,7 +19,6 @@ public final class GestureCoordinator: NSObject {
         self.view = view
         self.gestureView = gestureView
         super.init()
-        setupGestures()
     }
 
     /// Настройка всех жестов
@@ -47,6 +37,7 @@ public final class GestureCoordinator: NSObject {
         let singleTap = UITapGestureRecognizer()
         singleTap.numberOfTapsRequired = 1
         singleTap.cancelsTouchesInView = false
+        singleTap.delegate = self
 
         // Для тестирования убираем doubleTap, чтобы singleTap работал правильно
         // let doubleTap = UITapGestureRecognizer()
@@ -64,10 +55,12 @@ public final class GestureCoordinator: NSObject {
         let swipeLeft = UISwipeGestureRecognizer()
         swipeLeft.direction = .left
         swipeLeft.cancelsTouchesInView = false
+        swipeLeft.delegate = self
         
         let swipeRight = UISwipeGestureRecognizer()
         swipeRight.direction = .right
         swipeRight.cancelsTouchesInView = false
+        swipeRight.delegate = self
         
         addGesture(swipeLeft, to: view, kind: .swipeLeft)
         addGesture(swipeRight, to: view, kind: .swipeRight)
@@ -77,7 +70,6 @@ public final class GestureCoordinator: NSObject {
     private func addGesture(_ gesture: UIGestureRecognizer, to view: UIView, kind: GestureKind) {
         gesture.addTarget(self, action: #selector(handleGesture(_:)))
         gesture.gestureKind = kind
-        gesture.gestureView = view
         view.addGestureRecognizer(gesture)
         addedGestures.append(gesture)
     }
@@ -85,7 +77,7 @@ public final class GestureCoordinator: NSObject {
     /// Обработка событий жестов
     @objc private func handleGesture(_ gesture: UIGestureRecognizer) {
         guard let kind = gesture.gestureKind,
-              let view = gesture.gestureView,
+              let view = gesture.view,
               gesture.state == .ended else { return }
 
         if let swipe = gesture as? UISwipeGestureRecognizer {
@@ -122,29 +114,18 @@ public final class GestureCoordinator: NSObject {
     }
 }
 
-// MARK: - UIGestureRecognizer Extensions
-
 private extension UIGestureRecognizer {
     private enum AssociatedKeys {
-        static var gestureKind = "gestureKind"
-        static var gestureView = "gestureView"
+        static var gestureKind: UInt8 = 0
     }
 
     var gestureKind: GestureKind? {
         get {
-            return objc_getAssociatedObject(self, AssociatedKeys.gestureKind) as? GestureKind
+            return objc_getAssociatedObject(self, &AssociatedKeys.gestureKind) as? GestureKind
         }
         set {
-            objc_setAssociatedObject(self, AssociatedKeys.gestureKind, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+            objc_setAssociatedObject(self, &AssociatedKeys.gestureKind, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         }
     }
 
-    var gestureView: UIView? {
-        get {
-            return objc_getAssociatedObject(self, AssociatedKeys.gestureView) as? UIView
-        }
-        set {
-            objc_setAssociatedObject(self, AssociatedKeys.gestureView, newValue, .OBJC_ASSOCIATION_ASSIGN)
-        }
-    }
 }

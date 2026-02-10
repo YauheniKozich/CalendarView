@@ -1,39 +1,29 @@
-//
-//  TapTracker.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 28.12.2025.
-//
-
-import Foundation
+ import Foundation
 
 /// Класс для отслеживания тапов
 /// Отвечает только за подсчет тапов и проверку порога
-public final class TapTracker: TapTracking {
+final class TapTracker: TapTracking {
     private var tapCount = 0
-    public var tapThreshold: Int = 5
+    var tapThreshold: Int = 5
     
-    public init(tapThreshold: Int = 5) {
+    init(tapThreshold: Int = 5) {
         self.tapThreshold = tapThreshold
     }
     
     /// Регистрация тапа
     /// - Returns: true если достигнут порог тапов
-    public func registerTap() -> Bool {
+    func registerTap() -> Bool {
         tapCount += 1
         Logger.debug("Tap registered: \(tapCount)/\(tapThreshold)", category: .gesture)
         return tapCount >= tapThreshold
     }
     
-    public func registerTap(on items: [AnimatableItem], in container: AnimationContainer) {
-        // Этот метод оставлен для совместимости с протоколом
-        // Реальная логика в registerTap()
+    func registerTap(on items: [AnimatableItem], in container: AnimationContainer) {
         _ = registerTap()
     }
     
-    public func resetTapCount() {
+    func resetTapCount() {
         tapCount = 0
         Logger.debug("Tap count reset", category: .gesture)
     }
 }
-

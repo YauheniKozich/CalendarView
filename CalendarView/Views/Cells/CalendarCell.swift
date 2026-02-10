@@ -1,11 +1,4 @@
-//
-//  CalendarCell.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 13.05.25.
-//
-
-import UIKit
+ import UIKit
 
 final class CalendarCell: UICollectionViewCell {
     private let label = UILabel()
@@ -37,7 +30,6 @@ final class CalendarCell: UICollectionViewCell {
         contentView.layer.borderColor = nil
         isUserInteractionEnabled = true
 
-        // Reset accessibility state
         isAccessibilityElement = false
         accessibilityLabel = nil
         accessibilityHint = nil
@@ -78,6 +70,7 @@ final class CalendarCell: UICollectionViewCell {
         contentView.backgroundColor = .white
         contentView.layer.borderWidth = 0
         contentView.layer.borderColor = nil
+        accessibilityIdentifier = nil
 
         isAccessibilityElement = false
         accessibilityLabel = nil
@@ -88,6 +81,13 @@ final class CalendarCell: UICollectionViewCell {
     private func configureDateAppearance(date: Date, isSelected: Bool, isInRange: Bool, calendar: CalendarProvider) {
         let day = calendar.component(.day, from: date)
         label.text = "\(day)"
+
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        if let year = components.year, let month = components.month, let day = components.day {
+            accessibilityIdentifier = "calendarCell_\(year)_\(month)_\(day)"
+        } else {
+            accessibilityIdentifier = nil
+        }
 
         let isWeekend = calendar.isDateInWeekend(date)
         setBackground(isWeekend: isWeekend, isSelected: isSelected, isInRange: isInRange)

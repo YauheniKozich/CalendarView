@@ -1,16 +1,9 @@
-//
-//  TapTracking.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 28.12.2025.
-//
-
-import Foundation
+ import Foundation
 
 /// Протокол для отслеживания тапов (опциональная функциональность)
 /// Позволяет разделить ответственность отслеживания тапов от анимации
 /// Реализации должны работать на MainActor для работы с UIKit
-public protocol TapTracking {
+protocol TapTracking {
     /// Регистрация тапа для активации действия
     /// - Parameters:
     ///   - items: Элементы для анимации
@@ -23,4 +16,3 @@ public protocol TapTracking {
     /// Порог тапов для активации действия
     var tapThreshold: Int { get set }
 }
-

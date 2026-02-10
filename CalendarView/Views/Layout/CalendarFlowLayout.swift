@@ -1,15 +1,8 @@
-//
-//  CalendarFlowLayout.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 13.05.25.
-//
-
-import UIKit
+ import UIKit
 
 final class CalendarFlowLayout: UICollectionViewFlowLayout {
 
-    public override func prepare() {
+    override func prepare() {
         super.prepare()
         guard let collectionView = collectionView else { return }
 
@@ -17,21 +10,23 @@ final class CalendarFlowLayout: UICollectionViewFlowLayout {
         let spacing = minimumInteritemSpacing
         let totalSpacing = spacing * (numberOfColumns - 1)
         let availableWidth = collectionView.bounds.width - totalSpacing
+        guard availableWidth > 0 else { return }
         let itemWidth = floor(availableWidth / numberOfColumns)
+        guard itemWidth > 0 else { return }
 
         itemSize = CGSize(width: itemWidth, height: itemWidth)
     }
 
-    public override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
+    override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
         guard let collectionView = collectionView else { return false }
-        return newBounds.width != collectionView.bounds.width
+        return newBounds.size != collectionView.bounds.size
     }
 
-    public override func invalidateLayout() {
+    override func invalidateLayout() {
         super.invalidateLayout()
     }
 
-    public override func layoutAttributesForItem(at indexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
+    override func layoutAttributesForItem(at indexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
         guard let attributes = super.layoutAttributesForItem(at: indexPath) else { return nil }
         let column = indexPath.item % 7
         if column == 0 || column == 6 {
@@ -40,7 +35,7 @@ final class CalendarFlowLayout: UICollectionViewFlowLayout {
         return attributes
     }
 
-    public override func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
+    override func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
         return super.layoutAttributesForElements(in: rect)
     }
 }

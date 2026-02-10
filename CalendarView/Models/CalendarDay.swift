@@ -1,20 +1,13 @@
-//
-//  CalendarDay.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 14.06.25.
-//
+ import Foundation
 
-import Foundation
-
-public struct CalendarDay: Hashable, Sendable {
+struct CalendarDay: Hashable, Sendable {
     let date: Date?
     let placeholderIndex: Int?
     let isPlaceholder: Bool
     let isSelected: Bool
     let isInRange: Bool
 
-    init(date: Date?, placeholderIndex: Int? = nil, selectedDatesSet: Set<String>, range: (start: Date, end: Date)?, calendar: CalendarProvider) {
+    init(date: Date?, placeholderIndex: Int? = nil, selectedDatesSet: Set<Int>, range: (start: Date, end: Date)?, calendar: CalendarProvider) {
         self.date = date
         self.placeholderIndex = placeholderIndex
         self.isPlaceholder = (date == nil)
@@ -26,7 +19,10 @@ public struct CalendarDay: Hashable, Sendable {
         }
 
         let components = calendar.dateComponents([.year, .month, .day], from: date)
-        let dateKey = "\(components.year ?? 0)-\(components.month ?? 0)-\(components.day ?? 0)"
+        let year = components.year ?? 0
+        let month = components.month ?? 0
+        let day = components.day ?? 0
+        let dateKey = year * 10000 + month * 100 + day
         isSelected = selectedDatesSet.contains(dateKey)
 
         isInRange = {
@@ -36,7 +32,7 @@ public struct CalendarDay: Hashable, Sendable {
         }()
     }
     
-    public func hash(into hasher: inout Hasher) {
+    func hash(into hasher: inout Hasher) {
         if let date = date {
             hasher.combine(date)
             hasher.combine(isSelected)
@@ -49,7 +45,7 @@ public struct CalendarDay: Hashable, Sendable {
         }
     }
     
-    public static func == (lhs: CalendarDay, rhs: CalendarDay) -> Bool {
+    static func == (lhs: CalendarDay, rhs: CalendarDay) -> Bool {
         if let lhsDate = lhs.date, let rhsDate = rhs.date {
             return lhsDate == rhsDate && lhs.isSelected == rhs.isSelected && lhs.isInRange == rhs.isInRange
         } else if lhs.placeholderIndex != nil || rhs.placeholderIndex != nil {

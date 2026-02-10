@@ -1,31 +1,24 @@
-//
-//  DateFormatterProviderImpl.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 14.06.25.
-//
-
-import Foundation
+ import Foundation
 
 /// Реализация DateFormatterProvider на основе DateFormatter
 /// Thread-safe реализация с использованием NSLock, так как DateFormatter не thread-safe
-public final class DateFormatterProviderImpl: DateFormatterProvider {
+final class DateFormatterProviderImpl: DateFormatterProvider {
     private let formatter: DateFormatter
     private let lock = NSLock()
 
-    public init(locale: Locale = .current, dateFormat: String? = nil) {
+    init(locale: Locale = .current, dateFormat: String? = nil) {
         self.formatter = DateFormatter()
         self.formatter.locale = locale
         self.formatter.dateFormat = dateFormat
     }
 
-    public func string(from date: Date) -> String {
+    func string(from date: Date) -> String {
         lock.lock()
         defer { lock.unlock() }
         return formatter.string(from: date)
     }
 
-    public func string(from date: Date, format: String) -> String {
+    func string(from date: Date, format: String) -> String {
         lock.lock()
         defer { lock.unlock() }
         
@@ -36,7 +29,7 @@ public final class DateFormatterProviderImpl: DateFormatterProvider {
         return formatter.string(from: date)
     }
 
-    public var locale: Locale? {
+    var locale: Locale? {
         get {
             lock.lock()
             defer { lock.unlock() }
@@ -49,7 +42,7 @@ public final class DateFormatterProviderImpl: DateFormatterProvider {
         }
     }
 
-    public var dateFormat: String? {
+    var dateFormat: String? {
         get {
             lock.lock()
             defer { lock.unlock() }

@@ -1,11 +1,4 @@
-//
-//  UsageExamples.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 28.12.2025.
-//
-
-import Foundation
+ import Foundation
 
 /// Примеры использования переиспользуемой архитектуры календаря
 enum CalendarUsageExamples {

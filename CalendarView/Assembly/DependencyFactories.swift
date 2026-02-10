@@ -1,101 +1,85 @@
-//
-//  DependencyFactories.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 28.12.2025.
-//
-
-import Foundation
-import UIKit
+ import UIKit
 
 /// Фабрики для создания зависимостей
 /// Предоставляет централизованный способ создания всех зависимостей приложения
-public enum DependencyFactories {
+enum DependencyFactories {
 
-    // MARK: - Calendar Provider Factory
-
-    public enum CalendarProviderFactory {
+    enum CalendarProviderFactory {
         /// Создает стандартный calendar provider
-        public static func makeDefault() -> CalendarProvider {
+        static func makeDefault() -> CalendarProvider {
             CalendarProviderImpl()
         }
 
         /// Создает calendar provider для тестирования
-        public static func makeForTesting() -> CalendarProvider {
+        static func makeForTesting() -> CalendarProvider {
             CalendarProviderImpl(calendar: Calendar(identifier: .gregorian))
         }
 
         /// Создает calendar provider с кастомным календарем
-        public static func make(with calendar: Calendar) -> CalendarProvider {
+        static func make(with calendar: Calendar) -> CalendarProvider {
             CalendarProviderImpl(calendar: calendar)
         }
 
         /// Создает calendar provider для конкретной локали
-        public static func make(for locale: Locale) -> CalendarProvider {
+        static func make(for locale: Locale) -> CalendarProvider {
             let calendar = Calendar.current
             return CalendarProviderImpl(calendar: calendar)
         }
     }
-
-    // MARK: - Date Storage Factory
     
-    public enum DateStorageFactory {
+    enum DateStorageFactory {
         /// Создает стандартное хранилище (UserDefaults)
         
-        public static func makeDefault() -> DateStorage {
+        static func makeDefault() -> DateStorage {
             UserDefaultsDateStorage()
         }
 
         /// Создает хранилище для тестирования (in-memory)
-        public static func makeForTesting() -> DateStorage {
+        static func makeForTesting() -> DateStorage {
             InMemoryDateStorage()
         }
 
         /// Создает хранилище с кастомным ключом
-        public static func make(with key: String) -> DateStorage {
+        static func make(with key: String) -> DateStorage {
             UserDefaultsDateStorage(key: key)
         }
 
         /// Создает хранилище с начальными данными
-        public static func makeForTesting(with initialDates: [Date]) -> DateStorage {
+        static func makeForTesting(with initialDates: [Date]) -> DateStorage {
             InMemoryDateStorage(initialDates: initialDates)
         }
     }
 
-    // MARK: - Date Formatter Factory
-
-    public enum DateFormatterFactory {
+    enum DateFormatterFactory {
         /// Создает стандартный date formatter
-        public static func makeDefault() -> DateFormatterProvider {
+        static func makeDefault() -> DateFormatterProvider {
             DateFormatterProviderImpl(dateFormat: "MMMM yyyy")
         }
 
         /// Создает date formatter для тестирования
-        public static func makeForTesting() -> DateFormatterProvider {
+        static func makeForTesting() -> DateFormatterProvider {
             DateFormatterProviderImpl(dateFormat: "yyyy-MM-dd")
         }
 
         /// Создает date formatter с кастомным форматом
-        public static func make(with format: String, locale: Locale = .current) -> DateFormatterProvider {
+        static func make(with format: String, locale: Locale = .current) -> DateFormatterProvider {
             DateFormatterProviderImpl(locale: locale, dateFormat: format)
         }
 
         /// Создает date formatter для конкретной локали
-        public static func make(for locale: Locale) -> DateFormatterProvider {
+        static func make(for locale: Locale) -> DateFormatterProvider {
             DateFormatterProviderImpl(locale: locale, dateFormat: "MMMM yyyy")
         }
     }
-
-    // MARK: - Explosion Animator Factory
     
-    public enum ExplosionAnimatorFactory {
+    enum ExplosionAnimatorFactory {
         /// Создает стандартный animator
-         public static func makeDefault() -> CalendarExplosionAnimator {
+         static func makeDefault() -> CalendarExplosionAnimator {
             CalendarExplosionAnimator()
         }
 
         /// Создает animator с кастомными параметрами
-         public static func make(minMagnitude: CGFloat = 0.5,
+         static func make(minMagnitude: CGFloat = 0.5,
                                maxMagnitude: CGFloat = 1.5,
                                elasticity: CGFloat = 0.6,
                                bottomBoundaryOffset: CGFloat = 80.0,
@@ -112,34 +96,30 @@ public enum DependencyFactories {
         }
 
         /// Создает animator для тестирования
-        public static func makeForTesting() -> CalendarExplosionAnimator {
+        static func makeForTesting() -> CalendarExplosionAnimator {
             make(minMagnitude: 0.1, maxMagnitude: 0.2, elasticity: 0.1, bottomBoundaryOffset: 20.0, animationTimeout: 2.0, tapThreshold: 1)
         }
     }
 
-    // MARK: - Gesture Coordinator Factory
-
-    public enum GestureCoordinatorFactory {
+    enum GestureCoordinatorFactory {
         /// Создает gesture coordinator для view
   
-        public static func make(for view: UIView, gestureView: UIView) -> GestureCoordinator {
+        static func make(for view: UIView, gestureView: UIView) -> GestureCoordinator {
             GestureCoordinator(view: view, gestureView: gestureView)
         }
 
         /// Создает gesture coordinator для тестирования
-        public static func makeForTesting(view: UIView? = nil,
+        static func makeForTesting(view: UIView? = nil,
                                          gestureView: UIView? = nil) -> GestureCoordinator {
             let testView = view ?? UIView()
             let testGestureView = gestureView ?? UIView()
             return make(for: testView, gestureView: testGestureView)
         }
     }
-
-    // MARK: - Configuration Factory
     
-    public enum ConfigurationFactory {
+    enum ConfigurationFactory {
         /// Создает стандартную конфигурацию
-        public static func makeDefault() -> CalendarConfiguration {
+        static func makeDefault() -> CalendarConfiguration {
             CalendarConfiguration(
                 calendar: CalendarProviderFactory.makeDefault(),
                 storage: DateStorageFactory.makeDefault(),
@@ -148,7 +128,7 @@ public enum DependencyFactories {
         }
 
         /// Создает конфигурацию для тестирования
-        public static func makeForTesting() -> CalendarConfiguration {
+        static func makeForTesting() -> CalendarConfiguration {
             CalendarConfiguration(
                 calendar: CalendarProviderFactory.makeForTesting(),
                 storage: DateStorageFactory.makeForTesting(),
@@ -157,7 +137,7 @@ public enum DependencyFactories {
         }
 
         /// Создает конфигурацию для тестирования с начальными данными
-        public static func makeForTesting(with initialDates: [Date]) -> CalendarConfiguration {
+        static func makeForTesting(with initialDates: [Date]) -> CalendarConfiguration {
             CalendarConfiguration(
                 calendar: CalendarProviderFactory.makeForTesting(),
                 storage: DateStorageFactory.makeForTesting(with: initialDates),
@@ -166,7 +146,7 @@ public enum DependencyFactories {
         }
 
         /// Создает кастомную конфигурацию
-        public static func make(calendar: CalendarProvider,
+        static func make(calendar: CalendarProvider,
                                storage: DateStorage,
                                dateFormatter: DateFormatterProvider) -> CalendarConfiguration {
             CalendarConfiguration(
@@ -177,7 +157,7 @@ public enum DependencyFactories {
         }
 
         /// Создает конфигурацию для конкретной локали
-        public static func make(for locale: Locale) -> CalendarConfiguration {
+        static func make(for locale: Locale) -> CalendarConfiguration {
             CalendarConfiguration(
                 calendar: CalendarProviderFactory.make(for: locale),
                 storage: DateStorageFactory.makeDefault(),
@@ -186,16 +166,14 @@ public enum DependencyFactories {
         }
     }
     
-    // MARK: - Haptic Feedback Factory
-    
-    public enum HapticFeedbackFactory {
+    enum HapticFeedbackFactory {
         /// Создает стандартный haptic feedback provider (UIKit)
-        public static func makeDefault() -> HapticFeedbackProvider {
+        static func makeDefault() -> HapticFeedbackProvider {
             UIKitHapticFeedbackProvider()
         }
         
         /// Создает haptic feedback provider для тестирования (no-op)
-        public static func makeForTesting() -> HapticFeedbackProvider {
+        static func makeForTesting() -> HapticFeedbackProvider {
             NoOpHapticFeedbackProvider()
         }
     }

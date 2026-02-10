@@ -1,11 +1,9 @@
-//
-import Foundation
-import UIKit
+ import UIKit
 
 /// Протокол для анимации "взрыва"
 /// Позволяет использовать разные реализации анимации
 /// Все реализации должны работать на MainActor, так как работают с UIKit компонентами
-public protocol ExplosionAnimator {
+protocol ExplosionAnimator {
     /// Запуск анимации взрыва
     /// - Parameters:
     ///   - items: Элементы для анимации

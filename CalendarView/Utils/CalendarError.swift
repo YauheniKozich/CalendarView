@@ -1,15 +1,7 @@
-//
-//  CalendarError.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 28.12.2025.
-//
-
-import Foundation
+ import Foundation
 
 /// Перечисление ошибок календаря
-public enum CalendarError: LocalizedError, Sendable {
-    // MARK: - Storage Errors
+enum CalendarError: LocalizedError, Sendable {
 
     /// Ошибка сохранения данных
     case saveFailed(reason: String)
@@ -20,8 +12,6 @@ public enum CalendarError: LocalizedError, Sendable {
     /// Данные повреждены или имеют неверный формат
     case corruptedData
 
-    // MARK: - Animation Errors
-
     /// Анимация уже выполняется
     case animationInProgress
 
@@ -30,8 +20,6 @@ public enum CalendarError: LocalizedError, Sendable {
 
     /// Недопустимые параметры анимации
     case invalidAnimationParameters(reason: String)
-
-    // MARK: - Calendar Errors
 
     /// Недопустимая дата
     case invalidDate
@@ -42,17 +30,13 @@ public enum CalendarError: LocalizedError, Sendable {
     /// Ошибка валидации даты
     case dateValidationFailed(reason: String)
 
-    // MARK: - UI Errors
-
     /// Collection view не найден
     case collectionViewNotFound
 
     /// Недопустимые bounds для анимации
     case invalidBoundsForAnimation
 
-    // MARK: - Properties
-
-    public var errorDescription: String? {
+    var errorDescription: String? {
         switch self {
         case .saveFailed(let reason):
             return "Не удалось сохранить данные: \(reason)"
@@ -79,7 +63,7 @@ public enum CalendarError: LocalizedError, Sendable {
         }
     }
 
-    public var failureReason: String? {
+    var failureReason: String? {
         switch self {
         case .saveFailed, .loadFailed, .corruptedData:
             return "Проблема с хранением данных"
@@ -92,7 +76,7 @@ public enum CalendarError: LocalizedError, Sendable {
         }
     }
 
-    public var recoverySuggestion: String? {
+    var recoverySuggestion: String? {
         switch self {
         case .saveFailed, .loadFailed:
             return "Проверьте доступ к хранилищу и повторите операцию"

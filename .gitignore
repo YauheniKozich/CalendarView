@@ -1,9 +1,3 @@
-# Swift Package Manager
-.build/
-Package.resolved
-*.xcodeproj
-xcuserdata/
-
 # macOS
 .DS_Store
 .AppleDouble
@@ -19,22 +13,17 @@ Icon
 .Spotlight-V100
 .Trashes
 
-# Compiled sources
-*.o
-*.a
-
-# SwiftPM
-.swiftpm/
-.build/
-
 # Xcode
 DerivedData/
 *.xcworkspace
-*.xcodeproj
 *.xcuserstate
-*.xcuserdata
+xcuserdata/
 
-# SwiftLint
-.swiftlint.yml
-SWIFTLINT_README.md
-swiftlint.sh
+# Test artifacts
+*.xcresult
+*.xctestrun
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved

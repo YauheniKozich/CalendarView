@@ -1,16 +1,9 @@
-//
-//  CalendarViewModelProtocol.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 14.06.25.
-//
-
-import Foundation
+ import Foundation
 
 /// Протокол для ViewModel календаря
 /// Определяет интерфейс для работы с календарными данными
 
-public protocol CalendarViewModelProtocol {
+protocol CalendarViewModelProtocol {
     var calendarDays: [CalendarDay] { get }
     var today: Date { get }
     var currentMonth: Date { get }

@@ -1,11 +1,4 @@
-//
-//  CalendarCell+Accessibility.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 28.12.2025.
-//
-
-import UIKit
+ import UIKit
 
 extension CalendarCell {
     /// Настройка accessibility для ячейки календаря

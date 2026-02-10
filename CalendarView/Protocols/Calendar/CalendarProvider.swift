@@ -1,9 +1,8 @@
-//
-import Foundation
+ import Foundation
 
 /// Протокол для абстракции календаря
 /// Позволяет использовать разные календари (григорианский, юлианский и т.д.)
-public protocol CalendarProvider {
+protocol CalendarProvider {
     /// Текущая дата
     var today: Date { get }
 

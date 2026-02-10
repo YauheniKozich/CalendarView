@@ -1,16 +1,9 @@
-//
-//  CalendarViewModel.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 14.06.25.
-//
-
-import Foundation
+ import Foundation
 
 /// Реализация CalendarViewModelProtocol
 /// Управляет состоянием календаря, выбранными датами и бизнес-логикой
 
-public final class CalendarViewModel: CalendarViewModelProtocol {
+final class CalendarViewModel: CalendarViewModelProtocol {
     private let _calendar: CalendarProvider
     private let baseDate: Date
     private let storage: DateStorage
@@ -19,13 +12,13 @@ public final class CalendarViewModel: CalendarViewModelProtocol {
     private(set) var currentMonthOffset = 0
     private(set) var selectedDates: [Date] = []
     private(set) var days: [Date?] = []
-    private(set) public var calendarDays: [CalendarDay] = []
+    private(set) var calendarDays: [CalendarDay] = []
 
     // Кеширование для оптимизации поиска selectedDates
-    private var _selectedDatesSetCache: Set<String>?
+    private var _selectedDatesSetCache: Set<Int>?
 
     /// Сегодняшняя дата
-    public var today: Date {
+    var today: Date {
         _calendar.today
     }
 
@@ -40,51 +33,46 @@ public final class CalendarViewModel: CalendarViewModelProtocol {
         self.baseDate = _calendar.today
     }
 
-    public func load() {
+    func load() {
         do {
             let loadedDates = try storage.load()
             if !loadedDates.isEmpty {
-                selectedDates = loadedDates.map { _calendar.startOfDay(for: $0) }.sorted()
+                applyLoadedDates(loadedDates)
             } else {
-                selectedDates = [today]
+                setDefaultSelection()
                 try storage.save(selectedDates)
-                currentMonthOffset = 0
             }
         } catch {
             Logger.error("Failed to load dates: \(error.localizedDescription)", category: .storage)
-            selectedDates = [_calendar.startOfDay(for: today)]
-            currentMonthOffset = 0
+            setDefaultSelection()
         }
         invalidateSelectedDatesSetCache()
         updateDays()
     }
 
     @MainActor
-    public func loadAsync() async throws {
+    func loadAsync() async throws {
+        defer { invalidateSelectedDatesSetCache() }
         do {
             let loadedDates = try await storage.loadAsync()
-        if !loadedDates.isEmpty {
-            selectedDates = loadedDates.map { _calendar.startOfDay(for: $0) }.sorted()
-        } else {
-                selectedDates = [today]
+            if !loadedDates.isEmpty {
+                applyLoadedDates(loadedDates)
+            } else {
+                setDefaultSelection()
                 try await storage.saveAsync(selectedDates)
-                currentMonthOffset = 0
             }
 
             updateDays()
-
         } catch {
             Logger.error("Failed to load dates asynchronously: \(error.localizedDescription)", category: .storage)
-            selectedDates = [today]
-            currentMonthOffset = 0
+            setDefaultSelection()
             updateDays()
             throw error
         }
-        invalidateSelectedDatesSetCache()
     }
 
 
-    public func save() {
+    func save() {
         do {
             try storage.save(selectedDates)
         } catch {
@@ -93,11 +81,11 @@ public final class CalendarViewModel: CalendarViewModelProtocol {
     }
 
     @MainActor
-    public func saveAsync() async throws {
+    func saveAsync() async throws {
         try await storage.saveAsync(selectedDates)
     }
 
-    public func updateDays() {
+    func updateDays() {
         // Инвалидируем кеш selectedDatesSet при обновлении дней
         invalidateSelectedDatesSetCache()
 
@@ -118,7 +106,7 @@ public final class CalendarViewModel: CalendarViewModelProtocol {
         calendarDays = makeCalendarDays()
     }
     
-    public func makeCalendarDays() -> [CalendarDay] {
+    func makeCalendarDays() -> [CalendarDay] {
         let range = selectedRange
         let selectedDatesSet = self.selectedDatesSet
         var placeholderIndex = 0
@@ -133,43 +121,62 @@ public final class CalendarViewModel: CalendarViewModelProtocol {
         }
     }
 
-    public var currentMonth: Date {
+    private func applyLoadedDates(_ loadedDates: [Date]) {
+        selectedDates = normalizeSelectedDates(loadedDates)
+        updateMonthOffsetForSelection()
+    }
+
+    private func normalizeSelectedDates(_ dates: [Date]) -> [Date] {
+        dates.map { _calendar.startOfDay(for: $0) }.sorted()
+    }
+
+    private func updateMonthOffsetForSelection() {
+        if let firstDate = selectedDates.first {
+            currentMonthOffset = monthOffset(from: baseDate, to: firstDate)
+        }
+    }
+
+    private func setDefaultSelection() {
+        selectedDates = [_calendar.startOfDay(for: today)]
+        currentMonthOffset = 0
+    }
+
+    var currentMonth: Date {
         _calendar.date(byAdding: Calendar.Component.month, value: currentMonthOffset, to: baseDate) ?? baseDate
     }
 
-    public var monthFormatter: DateFormatterProvider {
+    var monthFormatter: DateFormatterProvider {
         _dateFormatter
     }
     
-    public var dateFormatter: DateFormatterProvider {
+    var dateFormatter: DateFormatterProvider {
         _dateFormatter
     }
 
-    public var calendar: CalendarProvider {
+    var calendar: CalendarProvider {
         _calendar
     }
 
-    public var selectedDatesCount: Int {
+    var selectedDatesCount: Int {
         selectedDates.count
     }
 
-    public var hasSelectedDates: Bool {
+    var hasSelectedDates: Bool {
         !selectedDates.isEmpty
     }
 
-    public var firstSelectedDate: Date? {
+    var firstSelectedDate: Date? {
         selectedDates.first
     }
 
     /// Множество выбранных дат для быстрого поиска (с кешированием)
-    private var selectedDatesSet: Set<String> {
+    private var selectedDatesSet: Set<Int> {
         if let cached = _selectedDatesSetCache {
             return cached
         }
 
         let set = Set(selectedDates.map { date in
-            let components = _calendar.dateComponents([.year, .month, .day], from: date)
-            return "\(components.year ?? 0)-\(components.month ?? 0)-\(components.day ?? 0)"
+            dateKey(for: date)
         })
 
         _selectedDatesSetCache = set
@@ -182,7 +189,7 @@ public final class CalendarViewModel: CalendarViewModelProtocol {
     }
 
     /// Публичный метод для очистки кеша дат (для восстановления после взрыва)
-    public func clearDatesCache() {
+    func clearDatesCache() {
         invalidateSelectedDatesSetCache()
     }
 
@@ -194,7 +201,27 @@ public final class CalendarViewModel: CalendarViewModelProtocol {
         return (start: selectedDates[0], end: selectedDates[1])
     }
 
-    public func select(_ date: Date) {
+    /// Ключ даты для сопоставления выбранных дат
+    private func dateKey(for date: Date) -> Int {
+        let components = _calendar.dateComponents([.year, .month, .day], from: date)
+        let year = components.year ?? 0
+        let month = components.month ?? 0
+        let day = components.day ?? 0
+        return year * 10000 + month * 100 + day
+    }
+
+    /// Смещение месяцев от базовой даты до целевой даты
+    private func monthOffset(from base: Date, to target: Date) -> Int {
+        let baseComponents = _calendar.dateComponents([.year, .month], from: base)
+        let targetComponents = _calendar.dateComponents([.year, .month], from: target)
+        let baseYear = baseComponents.year ?? 0
+        let baseMonth = baseComponents.month ?? 0
+        let targetYear = targetComponents.year ?? 0
+        let targetMonth = targetComponents.month ?? 0
+        return (targetYear - baseYear) * 12 + (targetMonth - baseMonth)
+    }
+
+    func select(_ date: Date) {
         guard date.timeIntervalSince1970 > 0 else {
             Logger.warning("Invalid date provided for selection", category: .calendar)
             return
@@ -224,27 +251,24 @@ public final class CalendarViewModel: CalendarViewModelProtocol {
         save()
     }
 
-    public func clear() {
-        selectedDates = [_calendar.startOfDay(for: today)]
-        currentMonthOffset = 0
+    func clear() {
+        setDefaultSelection()
         invalidateSelectedDatesSetCache()
         save()
         updateDays()
     }
 
-    public func isDateSelected(_ date: Date) -> Bool {
-        let components = _calendar.dateComponents([.year, .month, .day], from: date)
-        let dateKey = "\(components.year ?? 0)-\(components.month ?? 0)-\(components.day ?? 0)"
-        return selectedDatesSet.contains(dateKey)
+    func isDateSelected(_ date: Date) -> Bool {
+        selectedDatesSet.contains(dateKey(for: date))
     }
 
-    public func isDateInRange(_ date: Date) -> Bool {
+    func isDateInRange(_ date: Date) -> Bool {
         guard let range = selectedRange else { return false }
         let normalizedDate = _calendar.startOfDay(for: date)
         return normalizedDate > range.start && normalizedDate < range.end
     }
 
-    public func changeMonth(by delta: Int) {
+    func changeMonth(by delta: Int) {
         currentMonthOffset += delta
         updateDays()
     }

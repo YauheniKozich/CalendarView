@@ -1,15 +1,6 @@
-//
-//  CalendarViewController.swift
-//  CalendarView
-//
-//  Created by Yauheni Kozich on 14.06.25.
-//
+ import UIKit
 
-import UIKit
-
-public final class CalendarViewController: UIViewController {
-
-    // MARK: - Types
+final class CalendarViewController: UIViewController {
 
     private enum Section {
         case main
@@ -24,13 +15,9 @@ public final class CalendarViewController: UIViewController {
         static let topMargin: CGFloat = 8
     }
 
-    // MARK: - Dependencies
-
     private let viewModel: any CalendarViewModelProtocol
     private let explosionAnimator: CalendarExplosionAnimator
     private let hapticFeedbackProvider: HapticFeedbackProvider
-
-    // MARK: - UI
 
     private let monthLabel = UILabel()
     private let clearButton = UIButton(type: .system)
@@ -42,6 +29,7 @@ public final class CalendarViewController: UIViewController {
         layout.minimumLineSpacing = 0
 
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        cv.accessibilityIdentifier = "calendarCollectionView"
         cv.register(
             CalendarCell.self,
             forCellWithReuseIdentifier: Constants.cellReuseIdentifier
@@ -51,17 +39,16 @@ public final class CalendarViewController: UIViewController {
         return cv
     }()
 
-    private lazy var dataSource = makeDataSource()
-
-    // MARK: - State
+    private lazy var dataSource = DataSourceBuilder.make(
+        for: collectionView,
+        viewModel: viewModel
+    )
 
     /// Флаг предотвращения одновременных анимаций переключения месяцев
     /// Доступ только из main thread (UI operations)
     private var isMonthTransitionInProgress = false
     private var gestureCoordinator: GestureCoordinator?
     private var isGestureCoordinatorSetup = false
-
-    // MARK: - Init
 
     init(
         viewModel: any CalendarViewModelProtocol,
@@ -81,9 +68,7 @@ public final class CalendarViewController: UIViewController {
         fatalError("init(coder:) has not been implemented")
     }
 
-    // MARK: - Lifecycle
-
-    public override func viewDidLoad() {
+    override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .white
 
@@ -91,69 +76,69 @@ public final class CalendarViewController: UIViewController {
         bindViewModel()
 
         viewModel.load()
-        viewModel.updateDays()
-        updateMonthLabel()
-        applySnapshot()
+        render()
 
         setupGestureCoordinatorIfNeeded()
     }
 
-    // MARK: - Bindings
-
     private func bindViewModel() {
-        // Setup button actions using traditional target-action pattern
         clearButton.addTarget(self, action: #selector(clearButtonTapped), for: .touchUpInside)
         resetButton.addTarget(self, action: #selector(resetButtonTapped), for: .touchUpInside)
-
-        // Note: View model updates will be handled manually when needed
     }
 
     @objc private func clearButtonTapped() {
         viewModel.clear()
-        viewModel.updateDays()
-        applySnapshot()
+        render()
     }
 
     @objc private func resetButtonTapped() {
         handleReset()
     }
 
-    // MARK: - DataSource
+    private enum DataSourceBuilder {
+        static func make(
+            for collectionView: UICollectionView,
+            viewModel: CalendarViewModelProtocol
+        ) -> UICollectionViewDiffableDataSource<Section, CalendarDay> {
+            UICollectionViewDiffableDataSource(collectionView: collectionView) { collectionView, indexPath, calendarDay in
+                guard let cell = collectionView.dequeueReusableCell(
+                    withReuseIdentifier: Constants.cellReuseIdentifier,
+                    for: indexPath
+                ) as? CalendarCell else {
+                    return UICollectionViewCell()
+                }
 
-    private func makeDataSource()
-    -> UICollectionViewDiffableDataSource<Section, CalendarDay> {
+                configure(
+                    cell,
+                    with: calendarDay,
+                    viewModel: viewModel
+                )
 
-        UICollectionViewDiffableDataSource(
-            collectionView: collectionView
-        ) { [weak self] collectionView, indexPath, calendarDay in
-
-            guard let self else {
-                return UICollectionViewCell()
+                return cell
             }
+        }
 
-            guard let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: Constants.cellReuseIdentifier,
-                for: indexPath
-            ) as? CalendarCell else {
-                return UICollectionViewCell()
-            }
-
+        private static func configure(
+            _ cell: CalendarCell,
+            with calendarDay: CalendarDay,
+            viewModel: CalendarViewModelProtocol
+        ) {
             if let date = calendarDay.date {
                 let isSelected = calendarDay.isSelected
                 let isInRange = calendarDay.isInRange
-                let isPast = date < self.viewModel.today
+                let isPast = date < viewModel.today
 
                 cell.configure(
                     with: date,
                     isSelected: isSelected,
                     isInRange: isInRange,
                     isPlaceholder: false,
-                    calendar: self.viewModel.calendar
+                    calendar: viewModel.calendar
                 )
 
                 cell.isUserInteractionEnabled = !isPast
 
-                let dateString = self.viewModel.dateFormatter
+                let dateString = viewModel.dateFormatter
                     .string(from: date, format: "d MMMM yyyy")
 
                 cell.configureAccessibility(
@@ -169,17 +154,13 @@ public final class CalendarViewController: UIViewController {
                     isSelected: false,
                     isInRange: false,
                     isPlaceholder: true,
-                    calendar: self.viewModel.calendar
+                    calendar: viewModel.calendar
                 )
                 cell.isUserInteractionEnabled = false
                 cell.isAccessibilityElement = false
             }
-
-            return cell
         }
     }
-
-    // MARK: - Snapshot
 
     private func applySnapshot(animated: Bool = true) {
         var snapshot = NSDiffableDataSourceSnapshot<Section, CalendarDay>()
@@ -187,8 +168,6 @@ public final class CalendarViewController: UIViewController {
         snapshot.appendItems(viewModel.calendarDays)
         dataSource.apply(snapshot, animatingDifferences: animated)
     }
-
-    // MARK: - Explosion
 
     private func configureExplosionCallback() {
         explosionAnimator.onAnimationComplete = { [weak self] in
@@ -199,23 +178,29 @@ public final class CalendarViewController: UIViewController {
     private func restoreAfterExplosion() {
         let cells = collectionView.visibleCells
         explosionAnimator.restoreUserInteraction(items: cells, in: view)
-        applySnapshot(animated: false)
+        render(animated: false)
     }
-
-    // MARK: - Reset
 
     private func handleReset() {
         hapticFeedbackProvider.selectionChanged()
         viewModel.clearDatesCache()
         viewModel.updateDays()
-        applySnapshot(animated: false)
+        explosionAnimator.restoreUserInteraction(items: collectionView.visibleCells, in: view)
+        explosionAnimator.resetTapCount()
+        render(animated: false)
+        collectionView.reloadData()
+        collectionView.layoutIfNeeded()
         collectionView.collectionViewLayout.invalidateLayout()
     }
 
-    // MARK: - Gestures
-
     private func setupGestureCoordinatorIfNeeded() {
-        guard !isGestureCoordinatorSetup, gestureCoordinator == nil else { return }
+        guard !isGestureCoordinatorSetup else { return }
+
+        if let existingCoordinator = gestureCoordinator {
+            setGestureCoordinator(existingCoordinator)
+            isGestureCoordinatorSetup = true
+            return
+        }
 
         let coordinator = DependencyFactories
             .GestureCoordinatorFactory
@@ -226,8 +211,16 @@ public final class CalendarViewController: UIViewController {
     }
 
     internal func setGestureCoordinator(_ coordinator: GestureCoordinator) {
-        // Предотвращаем повторную настройку одного и того же coordinator
-        guard gestureCoordinator !== coordinator else { return }
+        if gestureCoordinator === coordinator {
+            coordinator.onGestureEvent = { [weak self] event in
+                self?.handleGesture(event)
+            }
+
+            if !coordinator.isActive {
+                coordinator.setupGestures()
+            }
+            return
+        }
 
         gestureCoordinator?.removeGestures()
         gestureCoordinator = coordinator
@@ -236,7 +229,9 @@ public final class CalendarViewController: UIViewController {
             self?.handleGesture(event)
         }
 
-        coordinator.setupGestures()
+        if !coordinator.isActive {
+            coordinator.setupGestures()
+        }
     }
 
     private func handleGesture(_ event: GestureEvent) {
@@ -264,7 +259,6 @@ public final class CalendarViewController: UIViewController {
 
         let delta = direction == .left ? 1 : -1
         viewModel.changeMonth(by: delta)
-        viewModel.updateDays()
         updateMonthLabel()
 
         UIView.transition(
@@ -277,8 +271,6 @@ public final class CalendarViewController: UIViewController {
             self?.isMonthTransitionInProgress = false
         }
     }
-
-    // MARK: - UI Setup
 
     private func setupUI() {
         setupMonthLabel()
@@ -305,9 +297,7 @@ public final class CalendarViewController: UIViewController {
         view.addSubview(resetButton)
     }
 
-    // MARK: - Layout
-
-    public override func viewDidLayoutSubviews() {
+    override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
 
         let safeTop = view.safeAreaInsets.top
@@ -351,20 +341,21 @@ public final class CalendarViewController: UIViewController {
         )
     }
 
-    // MARK: - Helpers
-
     private func updateMonthLabel() {
         monthLabel.text = viewModel.monthFormatter
             .string(from: viewModel.currentMonth)
             .capitalized
     }
-}
 
-// MARK: - UICollectionViewDelegate
+    private func render(animated: Bool = true) {
+        updateMonthLabel()
+        applySnapshot(animated: animated)
+    }
+}
 
 extension CalendarViewController: UICollectionViewDelegate {
 
-    public func collectionView(
+    func collectionView(
         _ collectionView: UICollectionView,
         didSelectItemAt indexPath: IndexPath
     ) {

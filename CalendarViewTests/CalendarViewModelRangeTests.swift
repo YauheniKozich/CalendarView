@@ -1,11 +1,4 @@
-//
-//  CalendarViewModelRangeTests.swift
-//  CalendarViewTests
-//
-//  Created by Yauheni Kozich on 30.12.2025.
-//
-
-import XCTest
+ import XCTest
 @testable import CalendarView
 
 @MainActor
@@ -35,10 +28,10 @@ final class CalendarViewModelRangeTests: XCTestCase {
 
     @MainActor
     func testRangeSelection() {
-        let date1 = Date(timeIntervalSince1970: 1735689600) // 2025-01-01
-        let date2 = Date(timeIntervalSince1970: 1735862400) // 2025-01-03
-        let date3 = Date(timeIntervalSince1970: 1735948800) // 2025-01-05
-        let dateInRange = Date(timeIntervalSince1970: 1735776000) // 2025-01-02
+        let date1 = Date(timeIntervalSince1970: 1735689600)
+        let date2 = Date(timeIntervalSince1970: 1735862400)
+        let date3 = Date(timeIntervalSince1970: 1735948800)
+        let dateInRange = Date(timeIntervalSince1970: 1735776000)
 
         viewModel.select(date1)
         XCTAssertEqual(viewModel.selectedDatesCount, 1)
@@ -61,8 +54,8 @@ final class CalendarViewModelRangeTests: XCTestCase {
 
     @MainActor
     func testRangeBoundaries() {
-        let startDate = Date(timeIntervalSince1970: 1735689600) // 2025-01-01
-        let endDate = Date(timeIntervalSince1970: 1735862400)   // 2025-01-03
+        let startDate = Date(timeIntervalSince1970: 1735689600)
+        let endDate = Date(timeIntervalSince1970: 1735862400)
 
         viewModel.select(startDate)
         viewModel.select(endDate)
@@ -70,14 +63,14 @@ final class CalendarViewModelRangeTests: XCTestCase {
         XCTAssertFalse(viewModel.isDateInRange(startDate))
         XCTAssertFalse(viewModel.isDateInRange(endDate))
 
-        let middleDate = Date(timeIntervalSince1970: 1735776000) // 2025-01-02
+        let middleDate = Date(timeIntervalSince1970: 1735776000)
         XCTAssertTrue(viewModel.isDateInRange(middleDate))
     }
 
     @MainActor
     func testCalendarDaysIncludeRange() {
-        let date1 = Date(timeIntervalSince1970: 1735689600) // 2025-01-01
-        let date2 = Date(timeIntervalSince1970: 1735862400) // 2025-01-03
+        let date1 = Date(timeIntervalSince1970: 1735689600)
+        let date2 = Date(timeIntervalSince1970: 1735862400)
 
         viewModel.select(date1)
         viewModel.select(date2)
@@ -105,6 +98,42 @@ final class CalendarViewModelRangeTests: XCTestCase {
         let dateDays = calendarDays.filter { $0.date != nil }
         let rangeDays = dateDays.filter { $0.isInRange }
         XCTAssertTrue(rangeDays.isEmpty, "Should have no days in range when only 1 date is selected")
+    }
+
+    @MainActor
+    func testSelectedDatesPersistAndMonthRestoresOnLoad() {
+        let storedDate1 = Date(timeIntervalSince1970: 1740787200)
+        let storedDate2 = Date(timeIntervalSince1970: 1741219200)
+        mockStorage.store(dates: [storedDate2, storedDate1])
+
+        viewModel.load()
+
+        XCTAssertEqual(viewModel.selectedDatesCount, 2)
+        XCTAssertTrue(viewModel.isDateSelected(storedDate1))
+        XCTAssertTrue(viewModel.isDateSelected(storedDate2))
+
+        let components = mockCalendar.dateComponents([.year, .month], from: viewModel.currentMonth)
+        XCTAssertEqual(components.year, 2025)
+        XCTAssertEqual(components.month, 3)
+    }
+
+    @MainActor
+    func testChangeMonthShiftsCurrentMonth() {
+        let initialMonth = viewModel.currentMonth
+        viewModel.changeMonth(by: 1)
+        let nextMonth = viewModel.currentMonth
+
+        XCTAssertEqual(
+            mockCalendar.compare(initialMonth, to: nextMonth, toGranularity: .month),
+            .orderedAscending
+        )
+
+        viewModel.changeMonth(by: -1)
+        let backToInitial = viewModel.currentMonth
+        XCTAssertEqual(
+            mockCalendar.compare(initialMonth, to: backToInitial, toGranularity: .month),
+            .orderedSame
+        )
     }
 }
 
@@ -144,7 +173,7 @@ private class MockCalendarProvider: CalendarProvider {
     }
 
     var today: Date {
-        calendar.startOfDay(for: Date(timeIntervalSince1970: 1735689600)) // 2025-01-01 - дата в том же месяце, что и тестовые даты
+        calendar.startOfDay(for: Date(timeIntervalSince1970: 1735689600))
     }
 
     var firstWeekday: Int {
@@ -154,6 +183,10 @@ private class MockCalendarProvider: CalendarProvider {
     func compare(_ date1: Date, to date2: Date, toGranularity component: Calendar.Component) -> ComparisonResult {
         calendar.compare(date1, to: date2, toGranularity: component)
     }
+
+    func isDateInWeekend(_ date: Date) -> Bool {
+        calendar.isDateInWeekend(date)
+    }
 }
 
 private class MockDateStorage: DateStorage {
@@ -161,6 +194,10 @@ private class MockDateStorage: DateStorage {
 
     func load() throws -> [Date] {
         storedDates
+    }
+
+    func store(dates: [Date]) {
+        storedDates = dates
     }
 
     func save(_ dates: [Date]) throws {

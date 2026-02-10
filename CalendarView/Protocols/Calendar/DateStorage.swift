@@ -1,9 +1,8 @@
-//
-import Foundation
+ import Foundation
 
 /// Протокол для абстракции хранения дат
 /// Позволяет использовать разные хранилища (UserDefaults, Keychain, CoreData, сеть и т.д.)
-public protocol DateStorage {
+protocol DateStorage {
     /// Сохранить массив дат (синхронно)
     func save(_ dates: [Date]) throws
 
