@@ -93,7 +93,7 @@ final class CalendarCell: UICollectionViewCell {
 
         let isWeekend = calendar.isDateInWeekend(date)
         setBackground(isWeekend: isWeekend, isSelected: isSelected, isInRange: isInRange)
-        setTextColor(isSelected: isSelected, isInRange: isInRange)
+        setTextColor(isSelected: isSelected)
 
         contentView.layer.borderWidth = isInRange ? 2 : 0
         contentView.layer.borderColor = isInRange ? Colors.rangeBorder.cgColor : nil
@@ -111,7 +111,7 @@ final class CalendarCell: UICollectionViewCell {
         }
     }
 
-    private func setTextColor(isSelected: Bool, isInRange: Bool) {
-        label.textColor = (isSelected || isInRange) ? .white : .label
+    private func setTextColor(isSelected: Bool) {
+        label.textColor = isSelected ? .white : .label
     }
 }

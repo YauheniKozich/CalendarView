@@ -87,6 +87,7 @@ final class CalendarViewController: UIViewController {
     }
 
     @objc private func clearButtonTapped() {
+        restoreCalendarGrid()
         do {
             try viewModel.clear()
         } catch {
@@ -177,11 +178,14 @@ final class CalendarViewController: UIViewController {
 
     private func handleReset() {
         hapticFeedbackProvider.selectionChanged()
+        restoreCalendarGrid()
         viewModel.clearDatesCache()
         viewModel.updateDays()
-        explosionAnimator.restoreUserInteraction(items: collectionView.visibleCells, in: collectionView)
-        explosionAnimator.resetTapCount()
         render(animated: false)
+    }
+
+    private func restoreCalendarGrid() {
+        explosionAnimator.restoreUserInteraction(items: collectionView.visibleCells, in: collectionView)
     }
 
     private func setupGestureCoordinatorIfNeeded() {
@@ -247,6 +251,7 @@ final class CalendarViewController: UIViewController {
     private func handleSwipe(direction: UISwipeGestureRecognizer.Direction) {
         guard !isMonthTransitionInProgress else { return }
         isMonthTransitionInProgress = true
+        restoreCalendarGrid()
 
         let delta = direction == .left ? 1 : -1
         viewModel.changeMonth(by: delta)

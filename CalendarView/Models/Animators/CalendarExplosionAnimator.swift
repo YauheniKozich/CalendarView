@@ -297,11 +297,18 @@ final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, Expl
 
     private func cancelAsyncExplosion(id: UUID) {
         guard asyncContinuationID == id else { return }
-        restoreUserInteraction(items: [], in: animationContainer ?? UIView())
+        reset()
     }
 
     /// Сброс всех анимаций и состояний
     func reset() {
+        let collectionView = animatedCells.compactMap {
+            ($0.cell as? UICollectionViewCell)?.superview as? UICollectionView
+        }.first
+        restoreUserInteraction(items: [], in: collectionView ?? animationContainer ?? UIView())
+    }
+
+    private func stopAnimation() {
         explosionTask?.cancel()
         explosionTask = nil
         asyncContinuation?.resume(returning: false)
@@ -359,14 +366,14 @@ final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, Expl
         let uiItems = (items.compactMap { $0 as? UIView } + trackedCells.compactMap(\.cell))
             .filter { seenItems.insert(ObjectIdentifier($0)).inserted }
 
-        reset()
+        stopAnimation()
 
         uiItems.forEach { uiItem in
             if let originalState = trackedStates[ObjectIdentifier(uiItem)] {
                 uiItem.isUserInteractionEnabled = originalState.isUserInteractionEnabled
-                uiItem.frame = originalState.frame
                 uiItem.transform = originalState.transform
                 uiItem.transform3D = originalState.transform3D
+                uiItem.frame = originalState.frame
             } else {
                 uiItem.transform = .identity
             }
