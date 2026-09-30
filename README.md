@@ -1,19 +1,19 @@
-# CalendarView - Переиспользуемый календарь с эффектом взрыва ячеек
+# CalendarView - UIKit календарь с эффектом взрыва ячеек
 
 Мощный и гибкий компонент календаря для iOS с поддержкой выбора диапазонов дат и анимированным эффектом "взрыва" ячеек.
 
 ## Особенности
 
-- **Полностью переиспользуемая архитектура** с dependency injection
+- **Разделение UI, состояния и хранения** с dependency injection
 - **Выбор диапазона дат** с визуальным выделением
 - **Анимированный эффект взрыва** ячеек при 5‑кратном тапе
 - **Гибкая конфигурация** календаря, хранения и форматирования
-- **Поддержка разных календарей** (григорианский, юлианский и др.)
+- **Поддержка календарей Foundation** с согласованным форматированием дат
 - **Тестируемый дизайн** с протоколами и mock зависимостями
 - **Структурированное логирование** с категориями
-- **UIKit компонент** для интеграции в приложения
+- **UIKit экран календаря** с отдельными провайдерами хранения и дат
 - **Кеширование** для оптимизации производительности
-- **Async/await поддержка** для асинхронных операций
+- **Async/await для анимации** эффекта взрыва
 - **Восстановление выбранного диапазона** после перезапуска
 - **Валидация данных** и bounds checking
 - **Haptic feedback** для лучшего UX
@@ -66,20 +66,13 @@ let calendarVC = CalendarAssembly.makeCalendarViewController(
 ```swift
 let viewModel = CalendarAssembly.makeCalendarViewModel(configuration: configuration)
 viewModel.load()
-viewModel.select(Date())
+try viewModel.select(Date())
 ```
 
-### Async/Await поддержка
+### Async-анимация
 
 ```swift
-// Асинхронная загрузка
-let viewModel = CalendarAssembly.makeCalendarViewModel(configuration: config)
-try await viewModel.loadAsync()
-
-// Асинхронное сохранение
-try await viewModel.saveAsync()
-
-// Асинхронная анимация
+// Выполняйте вызов из MainActor-контекста.
 let animator = CalendarExplosionAnimator()
 let success = await animator.explodeAsync(items: cells, in: view)
 if success {
@@ -114,13 +107,14 @@ struct CalendarConfiguration {
 
 ### Примеры реализаций
 
-- `CalendarProviderImpl(calendar: Calendar(identifier: .gregorian))`
+- `CalendarProviderImpl(calendar: Calendar(identifier: .buddhist))`
 - `UserDefaultsDateStorage(key: "calendar")`
 - `InMemoryDateStorage(initialDates: [])`
 - `DateFormatterProviderImpl(locale: Locale(identifier: "ru_RU"), dateFormat: "MMMM yyyy")`
 
 ## Требования
 
-- iOS 13.0+
+- iOS 18.4+
+- iOS 18.4+ Simulator для тестовых таргетов
 - Swift 5.0+
-- Xcode 11.0+
+- Xcode 26.0+

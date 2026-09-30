@@ -22,18 +22,4 @@ final class InMemoryDateStorage: DateStorage {
         return storage
     }
 
-    func saveAsync(_ dates: [Date]) async throws {
-        try await Task { @MainActor [weak self] in
-            guard let self = self else { return }
-            try self.save(dates)
-        }.value
-    }
-
-    func loadAsync() async throws -> [Date] {
-        return try await Task { @MainActor [weak self] in
-            guard let self = self else { return [] }
-            return try self.load()
-        }.value
-    }
 }
-

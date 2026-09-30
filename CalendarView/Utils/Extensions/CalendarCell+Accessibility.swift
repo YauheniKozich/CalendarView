@@ -13,33 +13,32 @@ extension CalendarCell {
         dateString: String,
         isSelected: Bool,
         isInRange: Bool,
-        isPast: Bool
+        isPast: Bool,
+        locale: Locale?
     ) {
         isAccessibilityElement = true
 
         var accessibilityLabel = dateString
-
         if isSelected {
-            accessibilityLabel += ", выбрана"
+            accessibilityLabel += ", \(CalendarStrings.localized(.selected, locale: locale))"
         } else if isInRange {
-            accessibilityLabel += ", в диапазоне"
+            accessibilityLabel += ", \(CalendarStrings.localized(.inRange, locale: locale))"
         }
 
         if isPast {
-            accessibilityLabel += ", прошедшая дата"
+            accessibilityLabel += ", \(CalendarStrings.localized(.past, locale: locale))"
         }
 
         self.accessibilityLabel = accessibilityLabel
 
         if isPast {
-            accessibilityHint = "Эта дата уже прошла и недоступна для выбора"
+            accessibilityHint = CalendarStrings.localized(.pastHint, locale: locale)
         } else if !isSelected {
-            accessibilityHint = "Двойное нажатие для выбора даты"
+            accessibilityHint = CalendarStrings.localized(.selectHint, locale: locale)
         } else {
-            accessibilityHint = "Дата уже выбрана"
+            accessibilityHint = CalendarStrings.localized(.selectedHint, locale: locale)
         }
 
         accessibilityTraits = isSelected ? [.button, .selected] : .button
     }
 }
-

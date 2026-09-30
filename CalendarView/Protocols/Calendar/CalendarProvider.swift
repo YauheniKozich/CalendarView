@@ -1,8 +1,11 @@
  import Foundation
 
 /// Протокол для абстракции календаря
-/// Позволяет использовать разные календари (григорианский, юлианский и т.д.)
+/// Позволяет использовать календари Foundation с выбранной локалью и часовым поясом
 protocol CalendarProvider {
+    /// Foundation calendar used for date calculations and formatting
+    var foundationCalendar: Calendar { get }
+
     /// Текущая дата
     var today: Date { get }
 
@@ -26,6 +29,9 @@ protocol CalendarProvider {
 
     /// Первый день недели
     var firstWeekday: Int { get }
+
+    /// Краткие локализованные названия дней недели в календарном порядке
+    var shortWeekdaySymbols: [String] { get }
 
     /// Сравнение дат по гранулярности
     func compare(_ date1: Date, to date2: Date, toGranularity component: Calendar.Component) -> ComparisonResult

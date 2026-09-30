@@ -6,9 +6,10 @@ final class DateFormatterProviderImpl: DateFormatterProvider {
     private let formatter: DateFormatter
     private let lock = NSLock()
 
-    init(locale: Locale = .current, dateFormat: String? = nil) {
+    init(locale: Locale = .current, calendar: Calendar = .current, dateFormat: String? = nil) {
         self.formatter = DateFormatter()
         self.formatter.locale = locale
+        self.formatter.calendar = calendar
         self.formatter.dateFormat = dateFormat
     }
 
@@ -42,6 +43,19 @@ final class DateFormatterProviderImpl: DateFormatterProvider {
         }
     }
 
+    var calendar: Calendar {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return formatter.calendar
+        }
+        set {
+            lock.lock()
+            defer { lock.unlock() }
+            formatter.calendar = newValue
+        }
+    }
+
     var dateFormat: String? {
         get {
             lock.lock()
@@ -55,4 +69,3 @@ final class DateFormatterProviderImpl: DateFormatterProvider {
         }
     }
 }
-

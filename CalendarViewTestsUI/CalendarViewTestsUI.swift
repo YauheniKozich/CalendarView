@@ -13,6 +13,11 @@ final class CalendarViewTestsUI: XCTestCase {
     func testExample() throws {
         let app = XCUIApplication()
         app.launch()
+
+        let weekdayLabels = app.staticTexts.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "calendarWeekday_")
+        )
+        XCTAssertEqual(weekdayLabels.count, 7)
     }
 
     @MainActor
@@ -45,6 +50,21 @@ final class CalendarViewTestsUI: XCTestCase {
         let notHittable = NSPredicate(format: "isHittable == false")
         expectation(for: notHittable, evaluatedWith: cell)
         waitForExpectations(timeout: 5)
+
+        let autoRestored = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "isHittable == true"),
+            object: cell
+        )
+        autoRestored.isInverted = true
+        wait(for: [autoRestored], timeout: 11)
+        XCTAssertFalse(cell.isHittable, "Animation completion should not restore the grid")
+
+        let restoreButton = app.buttons["calendarRestoreButton"]
+        XCTAssertTrue(restoreButton.exists)
+        restoreButton.tap()
+
+        XCTAssertTrue(cell.waitForExistence(timeout: 5))
+        XCTAssertTrue(cell.isHittable, "Calendar cells should return to the grid after restore")
     }
 
 }

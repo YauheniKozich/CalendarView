@@ -1,6 +1,7 @@
  import Foundation
 
 /// Примеры использования переиспользуемой архитектуры календаря
+@MainActor
 enum CalendarUsageExamples {
 
     /// Пример использования календаря с дефолтными настройками
@@ -31,31 +32,13 @@ enum CalendarUsageExamples {
         return CalendarAssembly.makeCalendarViewModel(configuration: configuration)
     }
 
-    /// Пример использования async/await для загрузки данных
-    static func createCalendarWithAsyncLoading() async throws -> CalendarViewController {
-        let configuration = CalendarConfiguration(
-            calendar: CalendarProviderImpl(),
-            storage: UserDefaultsDateStorage(key: "asyncCalendar"),
-            dateFormatter: DateFormatterProviderImpl()
-        )
-
-        let viewModel = CalendarAssembly.makeCalendarViewModel(configuration: configuration)
-
-        // Асинхронная загрузка данных
-        try await viewModel.loadAsync()
-
-        // CalendarExplosionAnimator должен создаваться на main actor, так как работает с UIKit
-        let animator = await MainActor.run { DependencyFactories.ExplosionAnimatorFactory.makeDefault() }
-        return CalendarAssembly.makeCalendarViewController(configuration: configuration, explosionAnimator: animator)
-    }
-
-    /// Пример использования календаря с пользовательским календарем (например, юлианским)
-    static func createJulianCalendar() -> CalendarViewController {
-        let julianCalendar = Calendar(identifier: .gregorian) // Для примера используем григорианский
+    /// Пример использования календаря с пользовательским григорианским календарем
+    static func createGregorianCalendar() -> CalendarViewController {
+        let gregorianCalendar = Calendar(identifier: .gregorian)
 
         let configuration = DependencyFactories.ConfigurationFactory.make(
-            calendar: DependencyFactories.CalendarProviderFactory.make(with: julianCalendar),
-            storage: DependencyFactories.DateStorageFactory.make(with: "julianCalendar"),
+            calendar: DependencyFactories.CalendarProviderFactory.make(with: gregorianCalendar),
+            storage: DependencyFactories.DateStorageFactory.make(with: "gregorianCalendar"),
             dateFormatter: DependencyFactories.DateFormatterFactory.make(for: Locale(identifier: "en_US"))
         )
 

@@ -48,7 +48,7 @@ struct CalendarDay: Hashable, Sendable {
     static func == (lhs: CalendarDay, rhs: CalendarDay) -> Bool {
         if let lhsDate = lhs.date, let rhsDate = rhs.date {
             return lhsDate == rhsDate && lhs.isSelected == rhs.isSelected && lhs.isInRange == rhs.isInRange
-        } else if lhs.placeholderIndex != nil || rhs.placeholderIndex != nil {
+        } else if lhs.date == nil, rhs.date == nil {
             return lhs.placeholderIndex == rhs.placeholderIndex
         }
         return false

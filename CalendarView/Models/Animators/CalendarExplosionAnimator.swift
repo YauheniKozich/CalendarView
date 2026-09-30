@@ -4,7 +4,27 @@
 /// Использует UIKit Dynamics для реалистичной физической анимации
 /// Изолирован на MainActor, так как работает с UIKit компонентами
 
+@MainActor
 final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, ExplosionAnimator, TapTracking {
+
+    @MainActor
+    private final class AnimatedCellReference {
+        weak var cell: UIView?
+        let indexPath: IndexPath?
+        let frame: CGRect
+        let transform: CGAffineTransform
+        let transform3D: CATransform3D
+        let isUserInteractionEnabled: Bool
+
+        init(cell: UIView, indexPath: IndexPath?) {
+            self.cell = cell
+            self.indexPath = indexPath
+            self.frame = cell.frame
+            self.transform = cell.transform
+            self.transform3D = cell.transform3D
+            self.isUserInteractionEnabled = cell.isUserInteractionEnabled
+        }
+    }
 
     /// Минимальная сила толчка для ячеек
     private var minPushMagnitude: CGFloat
@@ -28,7 +48,12 @@ final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, Expl
     private var gravity: UIGravityBehavior?
     private var collision: UICollisionBehavior?
     private var itemBehavior: UIDynamicItemBehavior?
+    private var explosionTask: Task<Void, Never>?
     private var isExploding = false
+    private var asyncContinuation: CheckedContinuation<Bool, Never>?
+    private var asyncContinuationID: UUID?
+    private var animatedCells: [AnimatedCellReference] = []
+    private weak var animationContainer: UIView?
 
     private let tapTracker: TapTracker
     /// Количество тапов для активации взрыва
@@ -47,21 +72,33 @@ final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, Expl
     /// - Returns: true если анимация запущена успешно
     @discardableResult
     func explodeAsync(items: [AnimatableItem], in container: AnimationContainer) async -> Bool {
-        // Если анимация уже идет, завершаем немедленно
-        if self.isExploding {
+        guard canStartExplosion else {
             return false
         }
 
-        do {
-            try self.explode(items: items, in: container)
-            return await withCheckedContinuation { continuation in
-                self.onAnimationComplete = {
-                    continuation.resume(returning: true)
+        let continuationID = UUID()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                do {
+                    let (cells, view) = try validatedAnimationTargets(items: items, container: container)
+                    guard !cells.isEmpty else {
+                        throw CalendarError.invalidAnimationParameters(reason: "No items to animate")
+                    }
+                    startExplosion(
+                        cells: cells,
+                        in: view,
+                        continuation: continuation,
+                        continuationID: continuationID
+                    )
+                } catch {
+                    Logger.error("Async animation failed: \(error.localizedDescription)", category: .animation)
+                    continuation.resume(returning: false)
                 }
             }
-        } catch {
-            Logger.error("Async animation failed: \(error.localizedDescription)", category: .animation)
-            return false
+        } onCancel: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.cancelAsyncExplosion(id: continuationID)
+            }
         }
     }
 
@@ -88,30 +125,14 @@ final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, Expl
     ///   - container: Контейнер для анимации
     /// - Throws: CalendarError при ошибках валидации
     func explode(items: [AnimatableItem], in container: AnimationContainer) throws {
-        // Поскольку это UIKit-специфичная реализация, приводим типы
-        guard let cells = items as? [UIView],
-              let view = container as? UIView else {
-            Logger.error("Unsupported types for animation", category: .animation)
-            throw CalendarError.invalidAnimationParameters(reason: "Unsupported types for animation")
-        }
-
-        // Метод уже изолирован на MainActor через @MainActor на классе
-        // Проверка Thread.isMainThread оставлена для дополнительной безопасности
-        guard Thread.isMainThread else {
-            // Если вызван не с main thread, перенаправляем на main actor
-            Task { @MainActor [weak self] in
-                guard let self = self else { return }
-                try? self.explode(items: items, in: container)
-            }
-            return
-        }
+        let (cells, view) = try validatedAnimationTargets(items: items, container: container)
 
         guard !cells.isEmpty else {
             Logger.warning("Нет элементов для анимации", category: .animation)
             throw CalendarError.invalidAnimationParameters(reason: "No items to animate")
         }
 
-        guard !isExploding else {
+        guard canStartExplosion else {
             Logger.warning("Анимация уже выполняется", category: .animation)
             throw CalendarError.animationInProgress
         }
@@ -122,8 +143,38 @@ final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, Expl
             Logger.warning("Найдено \(itemsOutsideBounds.count) элементов вне границ контейнера", category: .animation)
         }
 
+        startExplosion(cells: cells, in: view)
+    }
+
+    private func validatedAnimationTargets(
+        items: [AnimatableItem],
+        container: AnimationContainer
+    ) throws -> ([UIView], UIView) {
+        guard let cells = items as? [UIView], let view = container as? UIView else {
+            Logger.error("Unsupported types for animation", category: .animation)
+            throw CalendarError.invalidAnimationParameters(reason: "Unsupported types for animation")
+        }
+        return (cells, view)
+    }
+
+    private func startExplosion(
+        cells: [UIView],
+        in view: UIView,
+        continuation: CheckedContinuation<Bool, Never>? = nil,
+        continuationID: UUID? = nil
+    ) {
         reset()
+        animationContainer = view
+        let collectionView = cells
+            .compactMap { ($0 as? UICollectionViewCell)?.superview as? UICollectionView }
+            .first
+        animatedCells = cells.map { cell in
+            let indexPath = (cell as? UICollectionViewCell).flatMap { collectionView?.indexPath(for: $0) }
+            return AnimatedCellReference(cell: cell, indexPath: indexPath)
+        }
         isExploding = true
+        asyncContinuation = continuation
+        asyncContinuationID = continuationID
 
         setupDynamicAnimator(in: view)
         setupPhysicsBehaviors(for: cells)
@@ -168,10 +219,7 @@ final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, Expl
     /// Принудительное завершение анимации
     private func forceAnimationCompletion() {
         guard isExploding else { return }
-        isExploding = false
-        timeoutTimer?.invalidate()
-        timeoutTimer = nil
-        onAnimationComplete?()
+        completeAnimation()
     }
     
     /// Настройка физических поведений
@@ -209,28 +257,56 @@ final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, Expl
     
     /// Применение сил взрыва к элементам
     private func applyExplosionForces(to cells: [UIView]) {
-        Task { @MainActor [weak self] in
-            guard let self  else { return }
+        explosionTask = Task { @MainActor [weak self] in
+            guard let self else { return }
             
             for cell in cells {
                 let delay = TimeInterval.random(in: 0...0.2)
-                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                } catch {
+                    return
+                }
+
+                guard !Task.isCancelled, let animator = self.animator else { return }
                 
                 let push = UIPushBehavior(items: [cell], mode: .instantaneous)
                 push.angle = CGFloat.random(in: 0...(.pi * 2))
                 push.magnitude = CGFloat.random(in: self.minPushMagnitude...self.maxPushMagnitude)
-                self.animator?.addBehavior(push)
+                animator.addBehavior(push)
             }
         }
     }
 
     func dynamicAnimatorDidPause(_ animator: UIDynamicAnimator) {
+        guard isExploding, self.animator === animator else { return }
+        completeAnimation()
+    }
+
+    private func completeAnimation() {
         isExploding = false
+        explosionTask?.cancel()
+        explosionTask = nil
+        timeoutTimer?.invalidate()
+        timeoutTimer = nil
+        asyncContinuation?.resume(returning: true)
+        asyncContinuation = nil
+        asyncContinuationID = nil
         onAnimationComplete?()
+    }
+
+    private func cancelAsyncExplosion(id: UUID) {
+        guard asyncContinuationID == id else { return }
+        restoreUserInteraction(items: [], in: animationContainer ?? UIView())
     }
 
     /// Сброс всех анимаций и состояний
     func reset() {
+        explosionTask?.cancel()
+        explosionTask = nil
+        asyncContinuation?.resume(returning: false)
+        asyncContinuation = nil
+        asyncContinuationID = nil
         animator?.removeAllBehaviors()
         animator = nil
         gravity = nil
@@ -238,6 +314,8 @@ final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, Expl
         itemBehavior = nil
         timeoutTimer?.invalidate()
         timeoutTimer = nil
+        animationContainer = nil
+        animatedCells.removeAll()
         isExploding = false
         tapTracker.resetTapCount()  // Сбрасываем счетчик тапов через TapTracker
     }
@@ -247,6 +325,8 @@ final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, Expl
     ///   - items: Элементы для анимации
     ///   - container: Контейнер для анимации
     func registerTap(on items: [AnimatableItem], in container: AnimationContainer) {
+        guard canStartExplosion else { return }
+
         if tapTracker.registerTap() {
             explodeSafely(items: items, in: container)
             // Отключаем взаимодействие только для UIView элементов
@@ -260,41 +340,73 @@ final class CalendarExplosionAnimator: NSObject, UIDynamicAnimatorDelegate, Expl
     ///   - items: Элементы для восстановления
     ///   - container: Контейнер для обновления
     func restoreUserInteraction(items: [AnimatableItem], in container: AnimationContainer) {
+        let trackedCells = animatedCells
+        let trackedStates = Dictionary(
+            trackedCells.compactMap { reference -> (ObjectIdentifier, AnimatedCellReference)? in
+                guard let cell = reference.cell else { return nil }
+                return (ObjectIdentifier(cell), reference)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let trackedIndexPaths = Dictionary(
+            trackedCells.compactMap { reference -> (ObjectIdentifier, IndexPath)? in
+                guard let cell = reference.cell, let indexPath = reference.indexPath else { return nil }
+                return (ObjectIdentifier(cell), indexPath)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+        var seenItems = Set<ObjectIdentifier>()
+        let uiItems = (items.compactMap { $0 as? UIView } + trackedCells.compactMap(\.cell))
+            .filter { seenItems.insert(ObjectIdentifier($0)).inserted }
+
         reset()
 
-        let uiItems = items.compactMap { $0 as? UIView }
-
         uiItems.forEach { uiItem in
-            uiItem.isUserInteractionEnabled = true
-            // Сбрасываем трансформации к единичной матрице для восстановления нормального вида
-            uiItem.transform = .identity
-        }
-
-        // Дополнительно сбрасываем любые изменения center, которые мог внести UIDynamicAnimator
-        // Это поможет восстановить правильные позиции ячеек
-        if let uiContainer = container as? UIView {
-            uiContainer.subviews.forEach { subview in
-                // Если subview - это ячейка календаря, сбрасываем любые смещения
-                if uiItems.contains(subview) {
-                    // Центр должен соответствовать оригинальной позиции
-                    // Для collection view ячеек center обычно соответствует center их frame
-                    let originalCenter = CGPoint(x: subview.frame.midX, y: subview.frame.midY)
-                    if subview.center != originalCenter {
-                        subview.center = originalCenter
-                    }
-                }
+            if let originalState = trackedStates[ObjectIdentifier(uiItem)] {
+                uiItem.isUserInteractionEnabled = originalState.isUserInteractionEnabled
+                uiItem.frame = originalState.frame
+                uiItem.transform = originalState.transform
+                uiItem.transform3D = originalState.transform3D
+            } else {
+                uiItem.transform = .identity
             }
         }
 
-        if let uiContainer = container as? UIView {
+        if let collectionView = container as? UICollectionView {
+            collectionView.collectionViewLayout.invalidateLayout()
+            collectionView.layoutIfNeeded()
+
+            for cell in uiItems.compactMap({ $0 as? UICollectionViewCell }) {
+                let indexPath = trackedIndexPaths[ObjectIdentifier(cell)]
+                    ?? collectionView.indexPath(for: cell)
+                guard
+                    let indexPath,
+                    let attributes = collectionView.collectionViewLayout
+                        .layoutAttributesForItem(at: indexPath)
+                else { continue }
+
+                cell.transform = .identity
+                cell.frame = attributes.frame
+                cell.transform3D = attributes.transform3D
+            }
+
+            collectionView.setNeedsLayout()
+            collectionView.layoutIfNeeded()
+        } else if let uiContainer = container as? UIView {
             uiContainer.setNeedsLayout()
             uiContainer.layoutIfNeeded()
         }
+
+        animatedCells.removeAll()
     }
     
     /// Проверяет, выполняется ли анимация
     var isAnimating: Bool {
         return isExploding
+    }
+
+    private var canStartExplosion: Bool {
+        !isExploding && animatedCells.isEmpty
     }
     
     /// Сбрасывает счетчик тапов

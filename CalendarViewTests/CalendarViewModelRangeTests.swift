@@ -27,24 +27,24 @@ final class CalendarViewModelRangeTests: XCTestCase {
     }
 
     @MainActor
-    func testRangeSelection() {
+    func testRangeSelection() throws {
         let date1 = Date(timeIntervalSince1970: 1735689600)
         let date2 = Date(timeIntervalSince1970: 1735862400)
         let date3 = Date(timeIntervalSince1970: 1735948800)
         let dateInRange = Date(timeIntervalSince1970: 1735776000)
 
-        viewModel.select(date1)
+        try viewModel.select(date1)
         XCTAssertEqual(viewModel.selectedDatesCount, 1)
         XCTAssertTrue(viewModel.isDateSelected(date1))
         XCTAssertFalse(viewModel.isDateInRange(dateInRange))
 
-        viewModel.select(date2)
+        try viewModel.select(date2)
         XCTAssertEqual(viewModel.selectedDatesCount, 2)
         XCTAssertTrue(viewModel.isDateSelected(date1))
         XCTAssertTrue(viewModel.isDateSelected(date2))
         XCTAssertTrue(viewModel.isDateInRange(dateInRange))
 
-        viewModel.select(date3)
+        try viewModel.select(date3)
         XCTAssertEqual(viewModel.selectedDatesCount, 2)
         XCTAssertFalse(viewModel.isDateSelected(date1))
         XCTAssertTrue(viewModel.isDateSelected(date2))
@@ -53,12 +53,12 @@ final class CalendarViewModelRangeTests: XCTestCase {
     }
 
     @MainActor
-    func testRangeBoundaries() {
+    func testRangeBoundaries() throws {
         let startDate = Date(timeIntervalSince1970: 1735689600)
         let endDate = Date(timeIntervalSince1970: 1735862400)
 
-        viewModel.select(startDate)
-        viewModel.select(endDate)
+        try viewModel.select(startDate)
+        try viewModel.select(endDate)
 
         XCTAssertFalse(viewModel.isDateInRange(startDate))
         XCTAssertFalse(viewModel.isDateInRange(endDate))
@@ -68,12 +68,12 @@ final class CalendarViewModelRangeTests: XCTestCase {
     }
 
     @MainActor
-    func testCalendarDaysIncludeRange() {
+    func testCalendarDaysIncludeRange() throws {
         let date1 = Date(timeIntervalSince1970: 1735689600)
         let date2 = Date(timeIntervalSince1970: 1735862400)
 
-        viewModel.select(date1)
-        viewModel.select(date2)
+        try viewModel.select(date1)
+        try viewModel.select(date2)
 
         let calendarDays = viewModel.makeCalendarDays()
         let dateDays = calendarDays.filter { $0.date != nil }
@@ -86,10 +86,10 @@ final class CalendarViewModelRangeTests: XCTestCase {
     }
 
     @MainActor
-    func testSingleDateNoRange() {
+    func testSingleDateNoRange() throws {
         let date = Date(timeIntervalSince1970: 1735689600)
 
-        viewModel.select(date)
+        try viewModel.select(date)
 
         XCTAssertEqual(viewModel.selectedDatesCount, 1)
         XCTAssertFalse(viewModel.isDateInRange(date))
@@ -118,6 +118,88 @@ final class CalendarViewModelRangeTests: XCTestCase {
     }
 
     @MainActor
+    func testLoadNormalizesAndDeduplicatesDatesFromSameDay() {
+        let morning = Date(timeIntervalSince1970: 1740787200)
+        let afternoon = morning.addingTimeInterval(12 * 60 * 60)
+        mockStorage.store(dates: [afternoon, morning])
+
+        viewModel.load()
+
+        XCTAssertEqual(viewModel.selectedDatesCount, 1)
+        XCTAssertTrue(viewModel.isDateSelected(morning))
+    }
+
+    @MainActor
+    func testLoadLimitsPersistedSelectionToTwoDates() {
+        let firstDate = Date(timeIntervalSince1970: 1_740_787_200)
+        let secondDate = firstDate.addingTimeInterval(86_400)
+        let thirdDate = secondDate.addingTimeInterval(86_400)
+        mockStorage.store(dates: [thirdDate, firstDate, secondDate])
+
+        viewModel.load()
+
+        XCTAssertEqual(viewModel.selectedDatesCount, 2)
+        XCTAssertTrue(viewModel.isDateSelected(firstDate))
+        XCTAssertTrue(viewModel.isDateSelected(secondDate))
+        XCTAssertFalse(viewModel.isDateSelected(thirdDate))
+    }
+
+    @MainActor
+    func testSelectAcceptsEpochWhenItIsToday() {
+        let epoch = Date(timeIntervalSince1970: 0)
+        let calendar = MockCalendarProvider(today: epoch)
+        let model = CalendarViewModel(
+            calendar: calendar,
+            storage: MockDateStorage(),
+            dateFormatter: mockDateFormatter
+        )
+
+        XCTAssertNoThrow(try model.select(epoch))
+
+        XCTAssertEqual(model.selectedDatesCount, 1)
+        XCTAssertTrue(model.isDateSelected(epoch))
+    }
+
+    @MainActor
+    func testSelectionAndClearPersistThroughSingleStorageAPI() throws {
+        let selectedDate = Date(timeIntervalSince1970: 1_735_776_000)
+
+        try viewModel.select(selectedDate)
+        XCTAssertEqual(try mockStorage.load(), [mockCalendar.startOfDay(for: selectedDate)])
+
+        try viewModel.clear()
+        XCTAssertEqual(try mockStorage.load(), [mockCalendar.today])
+    }
+
+    @MainActor
+    func testSelectionRollsBackWhenStorageSaveFails() throws {
+        viewModel.load()
+        let originalDate = try XCTUnwrap(viewModel.firstSelectedDate)
+        mockStorage.saveError = MockStorageError.expected
+
+        XCTAssertThrowsError(try viewModel.select(originalDate.addingTimeInterval(86_400)))
+
+        XCTAssertEqual(viewModel.selectedDatesCount, 1)
+        XCTAssertTrue(viewModel.isDateSelected(originalDate))
+        XCTAssertFalse(viewModel.isDateSelected(originalDate.addingTimeInterval(86_400)))
+    }
+
+    @MainActor
+    func testClearRollsBackWhenStorageSaveFails() throws {
+        viewModel.load()
+        let originalDate = try XCTUnwrap(viewModel.firstSelectedDate)
+        let secondDate = originalDate.addingTimeInterval(86_400)
+        try viewModel.select(secondDate)
+        mockStorage.saveError = MockStorageError.expected
+
+        XCTAssertThrowsError(try viewModel.clear())
+
+        XCTAssertEqual(viewModel.selectedDatesCount, 2)
+        XCTAssertTrue(viewModel.isDateSelected(originalDate))
+        XCTAssertTrue(viewModel.isDateSelected(secondDate))
+    }
+
+    @MainActor
     func testChangeMonthShiftsCurrentMonth() {
         let initialMonth = viewModel.currentMonth
         viewModel.changeMonth(by: 1)
@@ -138,10 +220,20 @@ final class CalendarViewModelRangeTests: XCTestCase {
 }
 
 private class MockCalendarProvider: CalendarProvider {
+    private let fixedToday: Date
+
+    init(today: Date = Date(timeIntervalSince1970: 1735689600)) {
+        fixedToday = today
+    }
+
     private var calendar: Calendar {
         var cal = Calendar.current
         cal.timeZone = TimeZone.current
         return cal
+    }
+
+    var foundationCalendar: Calendar {
+        calendar
     }
 
     func dateComponents(_ components: Set<Calendar.Component>, from date: Date) -> DateComponents {
@@ -173,11 +265,15 @@ private class MockCalendarProvider: CalendarProvider {
     }
 
     var today: Date {
-        calendar.startOfDay(for: Date(timeIntervalSince1970: 1735689600))
+        calendar.startOfDay(for: fixedToday)
     }
 
     var firstWeekday: Int {
         calendar.firstWeekday
+    }
+
+    var shortWeekdaySymbols: [String] {
+        calendar.shortWeekdaySymbols
     }
 
     func compare(_ date1: Date, to date2: Date, toGranularity component: Calendar.Component) -> ComparisonResult {
@@ -189,8 +285,10 @@ private class MockCalendarProvider: CalendarProvider {
     }
 }
 
+@MainActor
 private class MockDateStorage: DateStorage {
     private var storedDates: [Date] = []
+    var saveError: Error?
 
     func load() throws -> [Date] {
         storedDates
@@ -201,20 +299,21 @@ private class MockDateStorage: DateStorage {
     }
 
     func save(_ dates: [Date]) throws {
+        if let saveError {
+            throw saveError
+        }
         storedDates = dates
     }
 
-    func loadAsync() async throws -> [Date] {
-        storedDates
-    }
+}
 
-    func saveAsync(_ dates: [Date]) async throws {
-        storedDates = dates
-    }
+private enum MockStorageError: Error {
+    case expected
 }
 
 private class MockDateFormatterProvider: DateFormatterProvider {
     var locale: Locale? = .current
+    var calendar: Calendar = .current
     var dateFormat: String? = "MMMM yyyy"
 
     func string(from date: Date) -> String {

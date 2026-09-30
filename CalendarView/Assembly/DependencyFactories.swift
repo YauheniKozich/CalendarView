@@ -22,7 +22,8 @@ enum DependencyFactories {
 
         /// Создает calendar provider для конкретной локали
         static func make(for locale: Locale) -> CalendarProvider {
-            let calendar = Calendar.current
+            var calendar = Calendar.current
+            calendar.locale = locale
             return CalendarProviderImpl(calendar: calendar)
         }
     }
@@ -72,6 +73,7 @@ enum DependencyFactories {
         }
     }
     
+    @MainActor
     enum ExplosionAnimatorFactory {
         /// Создает стандартный animator
          static func makeDefault() -> CalendarExplosionAnimator {

@@ -4,8 +4,8 @@ final class CalendarCell: UICollectionViewCell {
     private let label = UILabel()
     
     private enum Colors {
-        static let weekendBackground = UIColor.systemGray.withAlphaComponent(0.15)
-        static let weekdayBackground = UIColor.gray.withAlphaComponent(0.05)
+        static let weekendBackground = UIColor.tertiarySystemBackground
+        static let weekdayBackground = UIColor.systemBackground
         static let selectedBackground = UIColor.systemBlue
         static let rangeBackground = UIColor.systemBlue.withAlphaComponent(0.2)
         static let rangeBorder = UIColor.systemBlue
@@ -24,8 +24,8 @@ final class CalendarCell: UICollectionViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         label.text = ""
-        label.textColor = .black
-        contentView.backgroundColor = .white
+        label.textColor = .label
+        contentView.backgroundColor = .systemBackground
         contentView.layer.borderWidth = 0
         contentView.layer.borderColor = nil
         isUserInteractionEnabled = true
@@ -37,10 +37,10 @@ final class CalendarCell: UICollectionViewCell {
     }
 
     func configure(with date: Date?, isSelected: Bool, isInRange: Bool, isPlaceholder: Bool, calendar: CalendarProvider) {
-        if isPlaceholder || date == nil {
-            configurePlaceholder()
+        if !isPlaceholder, let date {
+            configureDateAppearance(date: date, isSelected: isSelected, isInRange: isInRange, calendar: calendar)
         } else {
-            configureDateAppearance(date: date!, isSelected: isSelected, isInRange: isInRange, calendar: calendar)
+            configurePlaceholder()
         }
     }
 
@@ -48,7 +48,9 @@ final class CalendarCell: UICollectionViewCell {
         label.textAlignment = .center
         label.font = UIFont.preferredFont(forTextStyle: .body)
         label.adjustsFontForContentSizeCategory = true
-        label.textColor = .black
+        label.adjustsFontSizeToFitWidth = true
+        label.minimumScaleFactor = 0.75
+        label.textColor = .label
         label.isAccessibilityElement = false
         label.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(label)
@@ -61,13 +63,13 @@ final class CalendarCell: UICollectionViewCell {
 
     private func setupContentView() {
         contentView.layer.cornerRadius = 10
-        contentView.backgroundColor = .white
+        contentView.backgroundColor = .systemBackground
     }
 
     private func configurePlaceholder() {
         label.text = ""
         label.textColor = .clear
-        contentView.backgroundColor = .white
+        contentView.backgroundColor = .systemBackground
         contentView.layer.borderWidth = 0
         contentView.layer.borderColor = nil
         accessibilityIdentifier = nil
@@ -110,6 +112,6 @@ final class CalendarCell: UICollectionViewCell {
     }
 
     private func setTextColor(isSelected: Bool, isInRange: Bool) {
-        label.textColor = (isSelected || isInRange) ? .white : .black
+        label.textColor = (isSelected || isInRange) ? .white : .label
     }
 }

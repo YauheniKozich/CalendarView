@@ -3,6 +3,7 @@
 /// Реализация CalendarViewModelProtocol
 /// Управляет состоянием календаря, выбранными датами и бизнес-логикой
 
+@MainActor
 final class CalendarViewModel: CalendarViewModelProtocol {
     private let _calendar: CalendarProvider
     private let baseDate: Date
@@ -30,17 +31,19 @@ final class CalendarViewModel: CalendarViewModelProtocol {
         self._calendar = calendar
         self.storage = storage
         self._dateFormatter = dateFormatter
+        self._dateFormatter.calendar = calendar.foundationCalendar
         self.baseDate = _calendar.today
     }
 
     func load() {
+        var shouldPersistDefaultSelection = false
         do {
             let loadedDates = try storage.load()
             if !loadedDates.isEmpty {
                 applyLoadedDates(loadedDates)
             } else {
                 setDefaultSelection()
-                try storage.save(selectedDates)
+                shouldPersistDefaultSelection = true
             }
         } catch {
             Logger.error("Failed to load dates: \(error.localizedDescription)", category: .storage)
@@ -48,41 +51,18 @@ final class CalendarViewModel: CalendarViewModelProtocol {
         }
         invalidateSelectedDatesSetCache()
         updateDays()
-    }
 
-    @MainActor
-    func loadAsync() async throws {
-        defer { invalidateSelectedDatesSetCache() }
-        do {
-            let loadedDates = try await storage.loadAsync()
-            if !loadedDates.isEmpty {
-                applyLoadedDates(loadedDates)
-            } else {
-                setDefaultSelection()
-                try await storage.saveAsync(selectedDates)
+        if shouldPersistDefaultSelection {
+            do {
+                try storage.save(selectedDates)
+            } catch {
+                Logger.error("Failed to save default dates: \(error.localizedDescription)", category: .storage)
             }
-
-            updateDays()
-        } catch {
-            Logger.error("Failed to load dates asynchronously: \(error.localizedDescription)", category: .storage)
-            setDefaultSelection()
-            updateDays()
-            throw error
         }
     }
 
-
-    func save() {
-        do {
-            try storage.save(selectedDates)
-        } catch {
-            Logger.error("Failed to save dates: \(error.localizedDescription)", category: .storage)
-        }
-    }
-
-    @MainActor
-    func saveAsync() async throws {
-        try await storage.saveAsync(selectedDates)
+    func save() throws {
+        try storage.save(selectedDates)
     }
 
     func updateDays() {
@@ -127,7 +107,7 @@ final class CalendarViewModel: CalendarViewModelProtocol {
     }
 
     private func normalizeSelectedDates(_ dates: [Date]) -> [Date] {
-        dates.map { _calendar.startOfDay(for: $0) }.sorted()
+        Array(Array(Set(dates.map { _calendar.startOfDay(for: $0) })).sorted().prefix(2))
     }
 
     private func updateMonthOffsetForSelection() {
@@ -221,12 +201,7 @@ final class CalendarViewModel: CalendarViewModelProtocol {
         return (targetYear - baseYear) * 12 + (targetMonth - baseMonth)
     }
 
-    func select(_ date: Date) {
-        guard date.timeIntervalSince1970 > 0 else {
-            Logger.warning("Invalid date provided for selection", category: .calendar)
-            return
-        }
-
+    func select(_ date: Date) throws {
         guard date >= today else {
             Logger.warning("Cannot select dates before today: \(date)", category: .calendar)
             return
@@ -238,6 +213,7 @@ final class CalendarViewModel: CalendarViewModelProtocol {
             return
         }
 
+        let previousSelection = selectedDates
         if selectedDates.count == 2 {
             selectedDates[0] = normalizedDate
             selectedDates.sort()
@@ -248,14 +224,31 @@ final class CalendarViewModel: CalendarViewModelProtocol {
 
         invalidateSelectedDatesSetCache()
         updateDays()
-        save()
+        do {
+            try save()
+        } catch {
+            selectedDates = previousSelection
+            invalidateSelectedDatesSetCache()
+            updateDays()
+            throw error
+        }
     }
 
-    func clear() {
+    func clear() throws {
+        let previousSelection = selectedDates
+        let previousMonthOffset = currentMonthOffset
         setDefaultSelection()
         invalidateSelectedDatesSetCache()
-        save()
         updateDays()
+        do {
+            try save()
+        } catch {
+            selectedDates = previousSelection
+            currentMonthOffset = previousMonthOffset
+            invalidateSelectedDatesSetCache()
+            updateDays()
+            throw error
+        }
     }
 
     func isDateSelected(_ date: Date) -> Bool {

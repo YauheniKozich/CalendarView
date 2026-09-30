@@ -1,0 +1,32 @@
+name: iOS
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Show Xcode and simulator versions
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available
+
+      - name: Build and run tests
+        run: >-
+          xcodebuild
+          -project CalendarView.xcodeproj
+          -scheme CalendarView
+          -destination 'platform=iOS Simulator,name=iPhone 16e,OS=26.2'
+          -derivedDataPath "$RUNNER_TEMP/CalendarViewDerivedData"
+          CODE_SIGNING_ALLOWED=NO
+          test

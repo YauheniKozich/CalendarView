@@ -3,6 +3,7 @@
 /// Протокол для ViewModel календаря
 /// Определяет интерфейс для работы с календарными данными
 
+@MainActor
 protocol CalendarViewModelProtocol {
     var calendarDays: [CalendarDay] { get }
     var today: Date { get }
@@ -16,17 +17,14 @@ protocol CalendarViewModelProtocol {
     var firstSelectedDate: Date? { get }
 
     func load()
-    func save()
+    func save() throws
     func updateDays()
-    func select(_ date: Date)
-    func clear()
+    func select(_ date: Date) throws
+    func clear() throws
     func isDateSelected(_ date: Date) -> Bool
     func isDateInRange(_ date: Date) -> Bool
     func changeMonth(by delta: Int)
     func makeCalendarDays() -> [CalendarDay]
     func clearDatesCache()
 
-    func loadAsync() async throws
-    func saveAsync() async throws
 }
-

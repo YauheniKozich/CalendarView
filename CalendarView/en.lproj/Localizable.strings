@@ -1,0 +1,8 @@
+"calendar.clear_dates" = "Clear dates";
+"calendar.restore" = "Restore";
+"calendar.accessibility.selected" = "selected";
+"calendar.accessibility.in_range" = "in range";
+"calendar.accessibility.past" = "past date";
+"calendar.accessibility.past_hint" = "This date has passed and can’t be selected";
+"calendar.accessibility.select_hint" = "Tap to select this date";
+"calendar.accessibility.selected_hint" = "This date is already selected";

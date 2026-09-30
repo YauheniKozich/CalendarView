@@ -31,6 +31,7 @@ struct CalendarConfiguration {
 enum CalendarAssembly {
     /// Создание ViewModel с конфигурацией
     
+    @MainActor
     static func makeCalendarViewModel(configuration: CalendarConfiguration? = nil) -> CalendarViewModel {
         let config = configuration ?? .default
         return CalendarViewModel(
@@ -41,6 +42,7 @@ enum CalendarAssembly {
     }
 
     /// Создание ViewController с конфигурацией
+   @MainActor
    static func makeCalendarViewController(
         configuration: CalendarConfiguration? = nil,
         explosionAnimator: CalendarExplosionAnimator? = nil,
@@ -58,6 +60,7 @@ enum CalendarAssembly {
     }
 
     /// Создание полного календаря с дефолтной конфигурацией
+    @MainActor
     static func makeDefaultCalendarViewController(
         explosionAnimator: CalendarExplosionAnimator? = nil,
         hapticFeedbackProvider: HapticFeedbackProvider? = nil
@@ -70,6 +73,7 @@ enum CalendarAssembly {
     }
 
     /// Создание календаря для тестирования
+    @MainActor
     static func makeTestingCalendarViewController(
         with initialDates: [Date] = [],
         explosionAnimator: CalendarExplosionAnimator? = nil,
@@ -86,6 +90,7 @@ enum CalendarAssembly {
     }
 
     /// Создание календаря для конкретной локали
+    @MainActor
     static func makeLocalizedCalendarViewController(
         for locale: Locale,
         explosionAnimator: CalendarExplosionAnimator? = nil,

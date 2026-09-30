@@ -8,11 +8,10 @@ final class CalendarViewController: UIViewController {
 
     private enum Constants {
         static let cellReuseIdentifier = "CalendarCell"
-        static let buttonHeight: CGFloat = 24
-        static let verticalSpacing: CGFloat = 8
         static let horizontalMargin: CGFloat = 16
-        static let monthLabelHeight: CGFloat = 30
-        static let topMargin: CGFloat = 8
+        static let layoutSpacing: CGFloat = 8
+        static let weekdayHeaderHeight: CGFloat = 32
+        static let minimumButtonHeight: CGFloat = 44
     }
 
     private let viewModel: any CalendarViewModelProtocol
@@ -20,6 +19,8 @@ final class CalendarViewController: UIViewController {
     private let hapticFeedbackProvider: HapticFeedbackProvider
 
     private let monthLabel = UILabel()
+    private let weekdayStackView = UIStackView()
+    private let buttonsStackView = UIStackView()
     private let clearButton = UIButton(type: .system)
     private let resetButton = UIButton(type: .system)
 
@@ -35,7 +36,7 @@ final class CalendarViewController: UIViewController {
             forCellWithReuseIdentifier: Constants.cellReuseIdentifier
         )
         cv.delegate = self
-        cv.backgroundColor = .white
+        cv.backgroundColor = .systemBackground
         return cv
     }()
 
@@ -61,7 +62,6 @@ final class CalendarViewController: UIViewController {
         self.hapticFeedbackProvider = hapticFeedbackProvider
         self.gestureCoordinator = gestureCoordinator
         super.init(nibName: nil, bundle: nil)
-        configureExplosionCallback()
     }
 
     required init?(coder: NSCoder) {
@@ -70,7 +70,7 @@ final class CalendarViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .white
+        view.backgroundColor = .systemBackground
 
         setupUI()
         bindViewModel()
@@ -87,7 +87,11 @@ final class CalendarViewController: UIViewController {
     }
 
     @objc private func clearButtonTapped() {
-        viewModel.clear()
+        do {
+            try viewModel.clear()
+        } catch {
+            Logger.error("Failed to clear selected dates: \(error.localizedDescription)", category: .storage)
+        }
         render()
     }
 
@@ -95,6 +99,7 @@ final class CalendarViewController: UIViewController {
         handleReset()
     }
 
+    @MainActor
     private enum DataSourceBuilder {
         static func make(
             for collectionView: UICollectionView,
@@ -146,7 +151,8 @@ final class CalendarViewController: UIViewController {
                     dateString: dateString,
                     isSelected: isSelected,
                     isInRange: isInRange,
-                    isPast: isPast
+                    isPast: isPast,
+                    locale: viewModel.dateFormatter.locale
                 )
             } else {
                 cell.configure(
@@ -169,28 +175,13 @@ final class CalendarViewController: UIViewController {
         dataSource.apply(snapshot, animatingDifferences: animated)
     }
 
-    private func configureExplosionCallback() {
-        explosionAnimator.onAnimationComplete = { [weak self] in
-            self?.restoreAfterExplosion()
-        }
-    }
-
-    private func restoreAfterExplosion() {
-        let cells = collectionView.visibleCells
-        explosionAnimator.restoreUserInteraction(items: cells, in: view)
-        render(animated: false)
-    }
-
     private func handleReset() {
         hapticFeedbackProvider.selectionChanged()
         viewModel.clearDatesCache()
         viewModel.updateDays()
-        explosionAnimator.restoreUserInteraction(items: collectionView.visibleCells, in: view)
+        explosionAnimator.restoreUserInteraction(items: collectionView.visibleCells, in: collectionView)
         explosionAnimator.resetTapCount()
         render(animated: false)
-        collectionView.reloadData()
-        collectionView.layoutIfNeeded()
-        collectionView.collectionViewLayout.invalidateLayout()
     }
 
     private func setupGestureCoordinatorIfNeeded() {
@@ -274,71 +265,106 @@ final class CalendarViewController: UIViewController {
 
     private func setupUI() {
         setupMonthLabel()
+        setupWeekdayHeader()
         view.addSubview(collectionView)
         setupButtons()
+        setupLayout()
     }
 
     private func setupMonthLabel() {
-        monthLabel.font = .boldSystemFont(ofSize: 20)
+        let descriptor = UIFont.preferredFont(forTextStyle: .title3).fontDescriptor
+            .withSymbolicTraits(.traitBold) ?? UIFont.preferredFont(forTextStyle: .title3).fontDescriptor
+        monthLabel.font = UIFont(descriptor: descriptor, size: 0)
+        monthLabel.adjustsFontForContentSizeCategory = true
+        monthLabel.numberOfLines = 0
         monthLabel.textAlignment = .center
-        monthLabel.textColor = .black
+        monthLabel.textColor = .label
         view.addSubview(monthLabel)
     }
 
-    private func setupButtons() {
-        clearButton.setTitle("Очистить даты", for: .normal)
-        clearButton.setTitleColor(.systemRed, for: .normal)
+    private func setupWeekdayHeader() {
+        weekdayStackView.axis = .horizontal
+        weekdayStackView.alignment = .fill
+        weekdayStackView.distribution = .fillEqually
+        weekdayStackView.spacing = 0
+        weekdayStackView.accessibilityIdentifier = "calendarWeekdayHeader"
+        view.addSubview(weekdayStackView)
 
-        resetButton.setTitle("Восстановить", for: .normal)
-        resetButton.backgroundColor = .systemBlue.withAlphaComponent(0.1)
-        resetButton.layer.cornerRadius = 8
+        let symbols = viewModel.calendar.shortWeekdaySymbols
+        guard symbols.count == 7 else { return }
 
-        view.addSubview(clearButton)
-        view.addSubview(resetButton)
+        let firstWeekdayIndex = (viewModel.calendar.firstWeekday - 1 + symbols.count) % symbols.count
+        for offset in 0..<symbols.count {
+            let label = UILabel()
+            label.text = symbols[(firstWeekdayIndex + offset) % symbols.count]
+            label.font = .preferredFont(forTextStyle: .footnote)
+            label.adjustsFontForContentSizeCategory = true
+            label.adjustsFontSizeToFitWidth = true
+            label.minimumScaleFactor = 0.75
+            label.accessibilityIdentifier = "calendarWeekday_\(offset)"
+            label.textAlignment = .center
+            label.textColor = .secondaryLabel
+            weekdayStackView.addArrangedSubview(label)
+        }
     }
 
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-
-        let safeTop = view.safeAreaInsets.top
-        let safeBottom = view.safeAreaInsets.bottom
-        let width = view.bounds.width - Constants.horizontalMargin * 2
-
-        monthLabel.frame = CGRect(
-            x: Constants.horizontalMargin,
-            y: safeTop + Constants.topMargin,
-            width: width,
-            height: Constants.monthLabelHeight
+    private func setupButtons() {
+        clearButton.setTitle(
+            CalendarStrings.localized(.clearDates, locale: viewModel.dateFormatter.locale),
+            for: .normal
         )
+        clearButton.setTitleColor(.systemRed, for: .normal)
+        clearButton.titleLabel?.font = .preferredFont(forTextStyle: .body)
+        clearButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        clearButton.accessibilityIdentifier = "calendarClearButton"
 
-        let buttonsHeight =
-            Constants.buttonHeight * 2 + Constants.verticalSpacing
-
-        let collectionTop = monthLabel.frame.maxY + Constants.topMargin
-
-        collectionView.frame = CGRect(
-            x: 0,
-            y: collectionTop,
-            width: view.bounds.width,
-            height: view.bounds.height
-                - collectionTop
-                - buttonsHeight
-                - safeBottom
+        resetButton.setTitle(
+            CalendarStrings.localized(.restore, locale: viewModel.dateFormatter.locale),
+            for: .normal
         )
+        resetButton.accessibilityIdentifier = "calendarRestoreButton"
+        resetButton.backgroundColor = .systemBlue.withAlphaComponent(0.1)
+        resetButton.layer.cornerRadius = 8
+        resetButton.titleLabel?.font = .preferredFont(forTextStyle: .body)
+        resetButton.titleLabel?.adjustsFontForContentSizeCategory = true
 
-        clearButton.frame = CGRect(
-            x: Constants.horizontalMargin,
-            y: view.bounds.height - safeBottom - buttonsHeight,
-            width: width,
-            height: Constants.buttonHeight
-        )
+        buttonsStackView.axis = .vertical
+        buttonsStackView.alignment = .fill
+        buttonsStackView.distribution = .fillEqually
+        buttonsStackView.spacing = Constants.layoutSpacing
+        buttonsStackView.addArrangedSubview(clearButton)
+        buttonsStackView.addArrangedSubview(resetButton)
+        view.addSubview(buttonsStackView)
+    }
 
-        resetButton.frame = CGRect(
-            x: Constants.horizontalMargin,
-            y: clearButton.frame.maxY + Constants.verticalSpacing,
-            width: width,
-            height: Constants.buttonHeight
-        )
+    private func setupLayout() {
+        [monthLabel, weekdayStackView, collectionView, buttonsStackView].forEach {
+            $0.translatesAutoresizingMaskIntoConstraints = false
+        }
+
+        collectionView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+
+        NSLayoutConstraint.activate([
+            monthLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Constants.layoutSpacing),
+            monthLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Constants.horizontalMargin),
+            monthLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Constants.horizontalMargin),
+
+            weekdayStackView.topAnchor.constraint(equalTo: monthLabel.bottomAnchor, constant: Constants.layoutSpacing),
+            weekdayStackView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            weekdayStackView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            weekdayStackView.heightAnchor.constraint(greaterThanOrEqualToConstant: Constants.weekdayHeaderHeight),
+
+            collectionView.topAnchor.constraint(equalTo: weekdayStackView.bottomAnchor),
+            collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            collectionView.bottomAnchor.constraint(equalTo: buttonsStackView.topAnchor, constant: -Constants.layoutSpacing),
+
+            buttonsStackView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Constants.horizontalMargin),
+            buttonsStackView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Constants.horizontalMargin),
+            buttonsStackView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Constants.layoutSpacing),
+            clearButton.heightAnchor.constraint(greaterThanOrEqualToConstant: Constants.minimumButtonHeight),
+            resetButton.heightAnchor.constraint(greaterThanOrEqualToConstant: Constants.minimumButtonHeight)
+        ])
     }
 
     private func updateMonthLabel() {
@@ -376,7 +402,13 @@ extension CalendarViewController: UICollectionViewDelegate {
             }
         }
 
-        viewModel.select(date)
+        do {
+            try viewModel.select(date)
+        } catch {
+            Logger.error("Failed to select date: \(error.localizedDescription)", category: .storage)
+            render()
+            return
+        }
         updateMonthLabel()
         applySnapshot()
     }

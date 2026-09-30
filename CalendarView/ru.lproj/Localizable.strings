@@ -1,0 +1,8 @@
+"calendar.clear_dates" = "Очистить даты";
+"calendar.restore" = "Восстановить";
+"calendar.accessibility.selected" = "выбрана";
+"calendar.accessibility.in_range" = "в диапазоне";
+"calendar.accessibility.past" = "прошедшая дата";
+"calendar.accessibility.past_hint" = "Эта дата уже прошла и недоступна для выбора";
+"calendar.accessibility.select_hint" = "Нажмите, чтобы выбрать дату";
+"calendar.accessibility.selected_hint" = "Дата уже выбрана";

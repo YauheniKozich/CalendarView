@@ -3,6 +3,7 @@
 /// Протокол для анимации "взрыва"
 /// Позволяет использовать разные реализации анимации
 /// Все реализации должны работать на MainActor, так как работают с UIKit компонентами
+@MainActor
 protocol ExplosionAnimator {
     /// Запуск анимации взрыва
     /// - Parameters:
@@ -39,4 +40,3 @@ protocol ExplosionAnimator {
     /// - Returns: true если анимация запущена успешно
     func explodeAsync(items: [AnimatableItem], in container: AnimationContainer) async -> Bool
 }
-
