@@ -227,8 +227,9 @@ private class MockCalendarProvider: CalendarProvider {
     }
 
     private var calendar: Calendar {
-        var cal = Calendar.current
-        cal.timeZone = TimeZone.current
+        var cal = Calendar(identifier: .gregorian)
+        cal.locale = Locale(identifier: "en_US_POSIX")
+        cal.timeZone = .gmt
         return cal
     }
 
@@ -312,13 +313,19 @@ private enum MockStorageError: Error {
 }
 
 private class MockDateFormatterProvider: DateFormatterProvider {
-    var locale: Locale? = .current
-    var calendar: Calendar = .current
+    var locale: Locale? = Locale(identifier: "en_US_POSIX")
+    var calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .gmt
+        return calendar
+    }()
     var dateFormat: String? = "MMMM yyyy"
 
     func string(from date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = locale
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
         formatter.dateFormat = dateFormat
         return formatter.string(from: date)
     }
@@ -326,6 +333,8 @@ private class MockDateFormatterProvider: DateFormatterProvider {
     func string(from date: Date, format: String) -> String {
         let formatter = DateFormatter()
         formatter.locale = locale
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
         formatter.dateFormat = format
         return formatter.string(from: date)
     }

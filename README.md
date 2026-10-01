@@ -39,6 +39,8 @@
 
 ## Использование
 
+Примеры предназначены для кода внутри приложения. Создание контроллера, ViewModel и аниматора, а также работа с ними выполняются в `MainActor`-контексте.
+
 ### Базовое использование
 
 ```swift
@@ -52,7 +54,10 @@ let calendarVC = CalendarAssembly.makeDefaultCalendarViewController(explosionAni
 let configuration = CalendarConfiguration(
     calendar: CalendarProviderImpl(calendar: Calendar(identifier: .gregorian)),
     storage: UserDefaultsDateStorage(key: "myCalendar"),
-    dateFormatter: DateFormatterProviderImpl(locale: Locale(identifier: "ru_RU"))
+    dateFormatter: DateFormatterProviderImpl(
+        locale: Locale(identifier: "ru_RU"),
+        dateFormat: "MMMM yyyy"
+    )
 )
 
 let calendarVC = CalendarAssembly.makeCalendarViewController(
@@ -71,13 +76,13 @@ try viewModel.select(Date())
 
 ### Async-анимация
 
+`explodeAsync` ожидает завершения анимации, включая завершение по таймауту, и возвращает `true`. При отмене, сбросе, недопустимых элементах или невозможности начать новую анимацию возвращается `false`. Завершение не восстанавливает сетку автоматически.
+
 ```swift
 // Выполняйте вызов из MainActor-контекста.
 let animator = CalendarExplosionAnimator()
-let success = await animator.explodeAsync(items: cells, in: view)
-if success {
-    print("Анимация запущена успешно")
-}
+let completed = await animator.explodeAsync(items: cells, in: view)
+Logger.debug("Анимация завершена: \(completed)", category: .animation)
 ```
 
 ### Конфигурация анимации
@@ -116,5 +121,37 @@ struct CalendarConfiguration {
 
 - iOS 18.4+
 - iOS 18.4+ Simulator для тестовых таргетов
-- Swift 5.0+
+- Swift language mode 5 (`SWIFT_VERSION = 5.0`); компилятор из поддерживаемой версии Xcode
 - Xcode 26.0+
+
+## Поведение календаря
+
+- Даты раньше сегодняшнего дня нельзя выбрать; `select(_:)` игнорирует их без ошибки.
+- Выбираются максимум две даты. При третьем выборе заменяется более ранняя граница, затем даты сортируются.
+- «Очистить даты» сбрасывает выбор на сегодняшнюю дату и показывает текущий месяц; выбранная дата сохраняется в хранилище.
+- После пяти одиночных тапов запускается взрыв ячеек. Завершение анимации оставляет их в изменённом положении. Кнопка восстановления возвращает сетку; очистка дат и смена месяца также восстанавливают её.
+
+## Запуск тестов
+
+Откройте `CalendarView.xcodeproj`, выберите схему `CalendarView` и iOS Simulator версии 18.4 или новее. Запустите тесты через **Product → Test** (`⌘U`).
+
+Для запуска из терминала сначала найдите доступный симулятор:
+
+```sh
+xcodebuild -project CalendarView.xcodeproj -scheme CalendarView -showdestinations
+```
+
+Подставьте его идентификатор вместо `SIMULATOR_UDID`:
+
+```sh
+# Только unit-тесты
+xcodebuild -project CalendarView.xcodeproj -scheme CalendarView \
+  -destination 'platform=iOS Simulator,id=SIMULATOR_UDID' \
+  -only-testing:CalendarViewTests test
+
+# Unit- и UI-тесты
+xcodebuild -project CalendarView.xcodeproj -scheme CalendarView \
+  -destination 'platform=iOS Simulator,id=SIMULATOR_UDID' test
+```
+
+`CalendarViewTests` проверяет выбор и сохранение дат, локализацию и состояние аниматора. `CalendarViewTestsUI` проверяет заголовки дней недели, взрыв после пяти тапов, восстановление сетки и запуск приложения в разных UI-конфигурациях.

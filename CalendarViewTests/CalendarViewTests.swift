@@ -37,14 +37,18 @@ final class CalendarViewTests: XCTestCase {
         XCTAssertEqual(provider.component(.day, from: date), 31)
     }
 
-    func testDateFormatterUsesConfiguredCalendar() {
+    func testDateFormatterUsesConfiguredCalendar() throws {
+        var calendar = Calendar(identifier: .buddhist)
+        calendar.timeZone = .gmt
+        // Keep the fixture away from the year boundary in every system time zone.
+        let date = try XCTUnwrap(calendar.date(from: DateComponents(year: 2568, month: 6, day: 15)))
         let formatter = DateFormatterProviderImpl(
             locale: Locale(identifier: "en_US"),
-            calendar: Calendar(identifier: .buddhist),
+            calendar: calendar,
             dateFormat: "yyyy"
         )
 
-        XCTAssertEqual(formatter.string(from: Date(timeIntervalSince1970: 1_735_689_600)), "2568")
+        XCTAssertEqual(formatter.string(from: date), "2568")
     }
 
     func testCalendarDayPlaceholderEqualityIsReflexive() {
