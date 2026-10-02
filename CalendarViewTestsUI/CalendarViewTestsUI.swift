@@ -28,7 +28,9 @@ final class CalendarViewTestsUI: XCTestCase {
         let collectionView = app.collectionViews["calendarCollectionView"]
         XCTAssertTrue(collectionView.waitForExistence(timeout: 5))
 
-        let cells = collectionView.cells
+        let cells = collectionView.cells.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "calendarCell_")
+        )
         var targetCell: XCUIElement?
         let maxIndex = min(cells.count, 42)
         if maxIndex > 0 {
@@ -41,29 +43,42 @@ final class CalendarViewTestsUI: XCTestCase {
             }
         }
 
-        let cell = try XCTUnwrap(targetCell, "No hittable calendar cell found")
+        let target = try XCTUnwrap(targetCell, "No hittable date cell found")
+        // Collection indices can change when selection updates or cells move.
+        let cell = collectionView.cells[target.identifier]
+        let originalFrame = cell.frame
+        let isInOriginalPosition = NSPredicate { _, _ in
+            guard cell.exists else { return false }
+            let frame = cell.frame
+            return abs(frame.midX - originalFrame.midX) < 2
+                && abs(frame.midY - originalFrame.midY) < 2
+                && abs(frame.width - originalFrame.width) < 2
+                && abs(frame.height - originalFrame.height) < 2
+        }
 
         for _ in 0..<5 {
             cell.tap()
         }
 
-        let notHittable = NSPredicate(format: "isHittable == false")
-        expectation(for: notHittable, evaluatedWith: cell)
+        // A displaced cell can still be hittable; verify that it left the grid.
+        let displaced = NSCompoundPredicate(notPredicateWithSubpredicate: isInOriginalPosition)
+        expectation(for: displaced, evaluatedWith: cell)
         waitForExpectations(timeout: 5)
 
         let autoRestored = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "isHittable == true"),
+            predicate: isInOriginalPosition,
             object: cell
         )
         autoRestored.isInverted = true
         wait(for: [autoRestored], timeout: 11)
-        XCTAssertFalse(cell.isHittable, "Animation completion should not restore the grid")
+        XCTAssertFalse(isInOriginalPosition.evaluate(with: cell), "Animation completion should not restore the grid")
 
         let restoreButton = app.buttons["calendarRestoreButton"]
         XCTAssertTrue(restoreButton.exists)
         restoreButton.tap()
 
-        XCTAssertTrue(cell.waitForExistence(timeout: 5))
+        expectation(for: isInOriginalPosition, evaluatedWith: cell)
+        waitForExpectations(timeout: 5)
         XCTAssertTrue(cell.isHittable, "Calendar cells should return to the grid after restore")
     }
 
